@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <stdbool.h>
 #include <ctime>
 #include <string>
 #include <iostream>
@@ -13,6 +14,9 @@
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include "lifecycle.hpp"
+extern "C"{
+	#include "timestamping.h"
+}
 
 #define UINT24_MAX 16777215
 #define INDEX_MASK (uint32_t) 0x00FFFFFF
@@ -120,7 +124,7 @@ namespace moonsniff {
 	/**
 	 * Log packets.
 	 */
-	void ms_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t seqnum_offset, const char* filename) {
+	void ms_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t seqnum_offset, const char* filename, bool embeddedTimestampInPacket) {
 		std::ofstream out (filename, std::ofstream::binary | std::ofstream::app);
 
 		while (libmoon::is_running(0)) {
@@ -128,10 +132,17 @@ namespace moonsniff {
 
 			for (int i = 0; i < rx; i++) {
 				if ((rx_pkts[i]->ol_flags | PKT_RX_IEEE1588_TMST) != 0) {
-					uint32_t* timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
-					uint32_t low = timestamp32[0];
-					uint32_t high = timestamp32[1];
-					uint64_t timestamp = high * 1000000000 + low;
+					uint64_t timestamp;
+					if(embeddedTimestampInPacket){
+						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
+						timestamp = get_timestamp_dynfield(rx_pkts[i]);
+					}else{
+						//timestamp on ixgbe NICs is in the end of the packet data
+						uint32_t* timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
+						uint32_t low = timestamp32[0];
+						uint32_t high = timestamp32[1];
+						timestamp = high * 1000000000 + low;
+					}
 
 					if (seqnum_offset < rx_pkts[i]->pkt_len) {
 						uint32_t identifier = *(uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + seqnum_offset);
@@ -173,7 +184,7 @@ namespace moonsniff {
 
 	bool useNanosecondTimestamps = true;
 
-	void pcap_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t runtime, const char* filename, uint32_t snap_len) {
+	void pcap_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t runtime, const char* filename, uint32_t snap_len, bool embeddedTimestampInPacket) {
 		int fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
 		if (!fd) {
 			std::cerr << "open failed" << std::endl;
@@ -224,7 +235,16 @@ namespace moonsniff {
 						addr = static_cast<uint8_t*>(temp);
 						size *= 2;
 					}
-					uint32_t* timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
+		
+					uint32_t* timestamp32;		
+					if(embeddedTimestampInPacket){
+						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
+						uint64_t timestamp64 = get_timestamp_dynfield(rx_pkts[i]);
+						timestamp32 = (uint32_t*)&timestamp64;
+					}else{
+						//timestamp on ixgbe NICs is in the end of the packet data
+						timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
+					}
 					uint32_t low = timestamp32[0];
 					uint32_t high = timestamp32[1];
 
@@ -267,12 +287,12 @@ extern "C" {
 		return moonsniff::fetch_stats();
 	}
 
-	void ms_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t seqnum_offset, const char* filename) {
-		moonsniff::ms_log_pkts(port_id, queue_id, rx_pkts, nb_pkts, seqnum_offset, filename);
+	void ms_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t seqnum_offset, const char* filename, bool embeddedTimestampInPacket) {
+		moonsniff::ms_log_pkts(port_id, queue_id, rx_pkts, nb_pkts, seqnum_offset, filename, embeddedTimestampInPacket);
 	}
 
-	void pcap_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t runtime, const char* filename, uint32_t snap_len) {
-		moonsniff::pcap_log_pkts(port_id, queue_id, rx_pkts, nb_pkts, runtime, filename, snap_len);
+	void pcap_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t runtime, const char* filename, uint32_t snap_len, bool embeddedTimestampInPacket) {
+		moonsniff::pcap_log_pkts(port_id, queue_id, rx_pkts, nb_pkts, runtime, filename, snap_len, embeddedTimestampInPacket);
 	}
 
 }

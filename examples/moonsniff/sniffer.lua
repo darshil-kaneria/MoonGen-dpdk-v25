@@ -164,11 +164,11 @@ function core_online(queue, bufs, pre, hist, args)
 end
 
 function core_offline(queue, bufs, filename, args)
-	C.ms_log_pkts(queue.id, queue.qid, bufs.array, bufs.size, args.seq_offset, filename)
+	C.ms_log_pkts(queue.id, queue.qid, bufs.array, bufs.size, args.seq_offset, filename, queue.dev.embeddedTimestampInPacket or false)
 end
 
 function core_capture_c(queue, bufs, filename, args)
-	C.pcap_log_pkts(queue.id, queue.qid, bufs.array, bufs.size, args.time, filename, args.snaplen)
+	C.pcap_log_pkts(queue.id, queue.qid, bufs.array, bufs.size, args.time, filename, args.snaplen, queue.dev.embeddedTimestampInPacket or false)
 end
 
 function core_capture(queue, bufs, writer, args)
