@@ -7,6 +7,7 @@ local hist   = require "histogram"
 local memory = require "memory"
 local stats  = require "stats"
 local timer  = require "timer"
+local dpdkc  = require "dpdkc"
 local ffi    = require "ffi"
 
 local PKT_SIZE = 60
@@ -76,7 +77,7 @@ function rxTimestamper(queue)
 	while mg.running() do
 		local numPkts = queue:recvWithTimestamps(bufs)
 		for i = 1, numPkts do
-			local rxTs = bufs[i].udata64
+			local rxTs = dpdkc.get_timestamp_dynfield(bufs[i])
 			local txTs = bufs[i]:getSoftwareTxTimestamp()
 			results[#results + 1] = tonumber(rxTs - txTs) / tscFreq * 10^9 -- to nanoseconds
 			rxts[#rxts + 1] = tonumber(rxTs)

@@ -11,11 +11,15 @@ set(LIBMOON_BUILD_LIBRARY true)
 add_definitions(-DLIBMOON_LUA_MAIN_MODULE="moongen-main")
 add_subdirectory(libmoon)
 
+# add tbb
+set(TBB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/tbb/cmake/)
+find_package(TBB REQUIRED tbb)
 
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${CMAKE_CURRENT_SOURCE_DIR}/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linuxapp-gcc/include
+	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/include
+	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/librte_ethdev
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/luajit/src
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/highwayhash/highwayhash
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/tbb/include
@@ -34,13 +38,16 @@ set(files
 )
 
 set(libraries
-	-Wl,--whole-archive
-	moon
+	-Wl,--whole-archive moon
+	${TBB_IMPORTED_TARGETS}
+	-Wl,--start-group ${dpdk_STATIC_LINK_LIBRARIES} ${dpdk_STATIC_LDFLAGS} ${dpdk_STATIC_LDFLAGS_OTHER} -Wl,--end-group
 )
 
 link_directories(
+	${dpdk_STATIC_LINK_DIRS}
 	${CMAKE_CURRENT_BINARY_DIR}/libmoon
-	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linuxapp-gcc/lib
+	${CMAKE_CURRENT_BINARY_DIR}/tbb_cmake_build/tbb_cmake_build_subdir_release
+	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/lib
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/luajit/usr/local/lib
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/highwayhash/lib
 )

@@ -5,6 +5,7 @@
 #include <rte_mempool.h>
 
 #include "device.h"
+#include "timestamping.h"
 
 static uint64_t bad_pkts_sent[RTE_MAX_ETHPORTS];
 static uint64_t bad_bytes_sent[RTE_MAX_ETHPORTS];
@@ -67,7 +68,8 @@ void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
 		// desired inter-frame spacing is encoded in the hash 'usr' field
-		uint32_t delay = (uint32_t) pkt->udata64;
+		uint32_t delay = (uint32_t) get_timestamp_dynfield(pkt);
+
 		// step 1: generate delay-packets
 		while (delay > 0) {
 			struct rte_mbuf* pkt = get_delay_pkt_bad_crc(pool, &delay, min_pkt_size);

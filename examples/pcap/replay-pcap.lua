@@ -7,6 +7,7 @@ local stats   = require "stats"
 local log     = require "log"
 local pcap    = require "pcap"
 local limiter = require "software-ratecontrol"
+local dkdpc   = require "dpdkc"
 
 function configure(parser)
 	parser:argument("dev", "Device to use."):args(1):convert(tonumber)
@@ -43,12 +44,12 @@ function replay(queue, file, loop, rateLimiter, multiplier, sleepTime)
 		if n > 0 then
 			if rateLimiter ~= nil then
 				if prev == 0 then
-					prev = bufs.array[0].udata64
+					prev = dpdkc.get_timestamp_dynfield(bufs.array[0])
 				end
 				for i = 1, n  do
 					local buf = bufs[i]
 					-- ts is in microseconds
-					local ts = buf.udata64
+					local ts = dpdkc.get_timestamp_dynfield(buf)
 					if prev > ts then
 						ts = prev
 					end

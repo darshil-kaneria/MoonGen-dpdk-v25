@@ -50,12 +50,13 @@ end
 --- Set the time to wait before the packet is sent for software rate-controlled send methods.
 --- @param delay The time to wait before this packet \(in bytes, i.e. 1 == 0.8 nanoseconds on 10 GbE\)
 function pkt:setDelay(delay)
-	self.udata64 = delay
+	dpdkc.set_timestamp_dynfield(self, delay)
 end
 
 --- sets the delay (cf. pkt:setDelay) to match a given packet rate in Mpps
 function pkt:setRate(rate)
-	self.udata64 = 10^10 / 8 / (rate * 10^6) - self.pkt_len - 24
+	
+	dpdkc.set_timestamp_dynfield(self, 10^10 / 8 / (rate * 10^6) - self.pkt_len - 24)
 end
 
 ffi.cdef[[

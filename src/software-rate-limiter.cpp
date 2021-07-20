@@ -13,6 +13,9 @@
 #include <unistd.h>
 #include "ring.h"
 #include "lifecycle.hpp"
+extern "C" {
+	#include "timestamping.h"
+}
 
 // required for gcc 4.7 for some reason
 // ???
@@ -62,7 +65,7 @@ namespace rate_limiter {
 			if (n) {
 				for (int i = 0; i < cur_batch_size; i++) {
 					// desired inter-frame spacing is encoded in the udata field (bytes on the wire)
-					id_cycles = ((uint64_t) bufs[i]->udata64 * 8 / link_bps) * tsc_hz;
+					id_cycles = ((uint64_t) get_timestamp_dynfield(bufs[i]) * 8 / link_bps) * tsc_hz;
 					next_send += id_cycles;
 					while ((cur = rte_get_tsc_cycles()) < next_send);
 					while (rte_eth_tx_burst(device, queue, bufs + i, 1) == 0) {
