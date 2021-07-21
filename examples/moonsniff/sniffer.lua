@@ -81,7 +81,6 @@ function master(args)
 end
 
 function timestamp(queue, otherdev, bar, pre, args)
---	queue.dev:enableRxTimestampsAllPackets(queue)
 	local bufs = memory.bufArray()
 	local drainQueue = timer:new(0.5)
 	while lm.running and drainQueue:running() do
@@ -183,9 +182,11 @@ function core_capture(queue, bufs, writer, args)
 			if timestamp then
 				-- convert to seconds
 				timestamp = timestamp / 1e9
-				-- remove timstamp from packet data
-				sz = bufs[i]:getSize() - 8
-				bufs[i]:setSize(sz)
+				-- remove timstamp from packet data (on x500)
+				if queue.dev.embeddedTimestampInPacket then
+					sz = bufs[i]:getSize() - 8
+					bufs[i]:setSize(sz)
+				end
 				writer:writeBuf(timestamp, bufs[i], args.snaplen)
 			end
 		end

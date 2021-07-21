@@ -220,12 +220,15 @@ namespace moonsniff {
 		memcpy(addr, &hdr, sizeof(pcap_hdr_t));
 		offset += sizeof(pcap_hdr_t);
 
+		//for x500 timestamping: remove timestamp from the end of the packet and adjust packet length 
+		uint32_t packetLengthAdjust = embeddedTimestampInPacket? 0:8;
+
 		while (libmoon::is_running(0) && std::difftime(std::time(nullptr), starttime) < runtime) {
 			uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
 
 			for (int i = 0; i < rx; i++) {
 				if ((rx_pkts[i]->ol_flags | PKT_RX_IEEE1588_TMST) != 0) {
-					uint32_t incl_len = (rx_pkts[i]->pkt_len - 8 < snap_len) ? rx_pkts[i]->pkt_len - 8 : snap_len;
+					uint32_t incl_len = (rx_pkts[i]->pkt_len - packetLengthAdjust < snap_len) ? rx_pkts[i]->pkt_len - packetLengthAdjust : snap_len;
 					if ((size_t)(offset + rx_pkts[i]->pkt_len + 8) >= size) {
 						ftruncate(fd, 2*size);
 						void* temp = mremap(addr, size, size*2, MREMAP_MAYMOVE);
@@ -236,22 +239,25 @@ namespace moonsniff {
 						size *= 2;
 					}
 		
-					uint32_t* timestamp32;		
+					uint32_t low;
+					uint32_t high;
 					if(embeddedTimestampInPacket){
 						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
 						uint64_t timestamp64 = get_timestamp_dynfield(rx_pkts[i]);
-						timestamp32 = (uint32_t*)&timestamp64;
+						uint32_t* timestamp32 = (uint32_t*)&timestamp64;
+						low = timestamp32[0];
+						high = timestamp32[1];
 					}else{
 						//timestamp on ixgbe NICs is in the end of the packet data
-						timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
+						uint32_t* timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
+						low = timestamp32[0];
+						high = timestamp32[1];
 					}
-					uint32_t low = timestamp32[0];
-					uint32_t high = timestamp32[1];
 
 					rechdr.ts_sec = high;
 					rechdr.ts_usec = low;
 					rechdr.incl_len = incl_len;
-					rechdr.orig_len = rx_pkts[i]->pkt_len - 8;
+					rechdr.orig_len = rx_pkts[i]->pkt_len - packetLengthAdjust;
 					memcpy(addr + offset, &rechdr, sizeof(rechdr));
 					memcpy(addr + offset + sizeof(rechdr), (uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off, incl_len);
 					offset += incl_len + 16;
