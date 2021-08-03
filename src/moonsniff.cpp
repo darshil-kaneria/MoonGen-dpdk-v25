@@ -244,9 +244,8 @@ namespace moonsniff {
 					if(embeddedTimestampInPacket){
 						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
 						uint64_t timestamp64 = get_timestamp_dynfield(rx_pkts[i]);
-						uint32_t* timestamp32 = (uint32_t*)&timestamp64;
-						low = timestamp32[0];
-						high = timestamp32[1];
+						low = timestamp64 % 1000000000;
+						high = timestamp64 / 1000000000;
 					}else{
 						//timestamp on ixgbe NICs is in the end of the packet data
 						uint32_t* timestamp32 = (uint32_t*)((uint8_t*)rx_pkts[i]->buf_addr + rx_pkts[i]->data_off + rx_pkts[i]->pkt_len - 8);
