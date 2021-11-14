@@ -61,7 +61,7 @@ Intel commodity NICs from the ice, igb, ixgbe, and i40e families support timesta
 The NICs implement this to support the IEEE 1588 PTP protocol, but this feature can be used to timestamp almost arbitrary UDP packets.
 MoonGen achieves a precision and accuracy of below 100 ns.
 
-Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to test your NIC's timestamping capabilities. Timestamping for Intel E810 VFs requires a modified version of the Linux PF driver.
+Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to test your NIC's timestamping capabilities. Timestamping for Intel E810 VFs requires a [modified version of the Linux PF driver](https://gitlab.lrz.de/idp-lachnit/ice).
 
 A more detailed evaluation can be found in [our paper](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf) [1].
 
