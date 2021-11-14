@@ -57,11 +57,11 @@ A third task is used to categorize and count the incoming packets.
 
 
 # Hardware Timestamping
-Intel commodity NICs from the igb, ixgbe, and i40e families support timestamping in hardware for both transmitted and received packets.
+Intel commodity NICs from the ice, igb, ixgbe, and i40e families support timestamping in hardware for both transmitted and received packets.
 The NICs implement this to support the IEEE 1588 PTP protocol, but this feature can be used to timestamp almost arbitrary UDP packets.
 MoonGen achieves a precision and accuracy of below 100 ns.
 
-Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to test your NIC's timestamping capabilities.
+Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to test your NIC's timestamping capabilities. Timestamping for Intel E810 VFs requires a modified version of the Linux PF driver.
 
 A more detailed evaluation can be found in [our paper](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf) [1].
 
@@ -82,6 +82,10 @@ Use `libmoon/deps/dpdk/usertools/dpdk-devbind.py ` to manage NICs manually.
 * gcc >= 4.8
 * make
 * cmake
+* meson
+* ninja-build
+* pkg-config
+* python3-pyelftools
 * libnuma-dev
 * kernel headers (for the DPDK igb-uio driver)
 * lspci (for `dpdk-devbind.py`)
@@ -90,7 +94,7 @@ Use `libmoon/deps/dpdk/usertools/dpdk-devbind.py ` to manage NICs manually.
 Run the following command to install these on Debian/Ubuntu:
 
 ```
-sudo apt-get install -y build-essential cmake linux-headers-`uname -r` pciutils libnuma-dev
+sudo apt-get install -y build-essential cmake linux-headers-`uname -r` pciutils libnuma-dev meson ninja-build pkg-config python3-pyelftools
 ```
 
 # Using MoonGen
@@ -138,9 +142,10 @@ All libmoon scripts are also valid MoonGen scripts as MoonGen extends libmoon.
 
 ### Which NICs do you support?
 Basic functionality is available on all [NICs supported by DPDK](http://dpdk.org/doc/nics).
-Hardware timestamping is currently supported and tested on Intel igb, ixgbe, and i40e NICs. However, support for specific features vary between models.
+Hardware timestamping is currently supported and tested on Intel ice, igb, and i40e NICs. However, support for specific features vary between models.
 Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to find out what your NIC supports.
-Hardware rate control is supported and tested on Intel ixgbe and i40e NICs.
+Hardware rate control is supported and tested on Intel ixgbe and i40e NICs. Hardware checksum offloading and timestamping currently does not work on ixgbe NICs with this version of Moongen.
+
 
 ### What's the difference between MoonGen and libmoon?
 MoonGen builds on [libmoon](https://github.com/libmoon/libmoon) by extending it with features for packet generators such as software rate control and software timestamping.

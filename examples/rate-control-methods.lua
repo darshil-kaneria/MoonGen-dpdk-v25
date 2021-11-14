@@ -8,7 +8,7 @@ local log     = require "log"
 local limiter = require "software-ratecontrol"
 
 local PKT_SIZE	= 60
-local ETH_DST	= "11:12:13:14:15:16"
+local ETH_DST	= "12:13:14:15:16:17"
 
 function master(txPort, rate, rc, pattern, threads)
 	if not txPort or not rate or not rc then

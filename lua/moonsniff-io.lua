@@ -142,7 +142,7 @@ function mod:newReader(filename)
 	return setmetatable({ fd = fd, ptr = ptr, size = size, offset = offset }, reader)
 end
 
---- Read the next packet into a buf, the timestamp is stored in the udata64 field as microseconds.
+--- Read the next packet into a buf, the timestamp is stored in the timestamping dynfield as microseconds.
 --- The buffer's packet size corresponds to the original packet size, cut off bytes are zero-filled.
 function reader:readSingle()
 	local fileRemaining = self.size - self.offset
