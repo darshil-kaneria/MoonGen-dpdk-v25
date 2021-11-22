@@ -18,7 +18,7 @@ uint64_t moongen_get_bad_bytes_sent(uint8_t port_id) {
 	return __sync_fetch_and_add(&bad_bytes_sent[port_id], 0);
 }
 
-static struct rte_mbuf* get_delay_pkt_bad_crc(struct rte_mempool* pool, uint32_t* rem_delay, uint32_t min_pkt_size) {
+static struct rte_mbuf* get_delay_pkt_bad_crc(struct rte_mempool* pool, uint32_t* rem_delay, uint32_t min_pkt_size, uint32_t packet_overhead) {
 	// _Thread_local support seems to suck in (older?) gcc versions?
 	// this should give us the best compatibility
 	static __thread uint32_t target = 0;
@@ -50,16 +50,20 @@ static struct rte_mbuf* get_delay_pkt_bad_crc(struct rte_mempool* pool, uint32_t
 	}
 	*rem_delay -= delay;
 	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pool);
+
 	// account for preamble, sfd, and ifg (CRC is disabled)
-	pkt->data_len = delay - 20;
-	pkt->pkt_len = delay - 20;
+	pkt->data_len = delay - packet_overhead;
+	pkt->pkt_len = delay - packet_overhead;
+
+	//disable crc checksum for this packet. This will be ignored on e810 NICs
 	pkt->ol_flags |= PKT_TX_NO_CRC_CSUM;
+
 	current += delay;
 	return pkt;
 }
 
 
-void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool, uint32_t min_pkt_size) {
+void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool, uint32_t min_pkt_size, uint32_t packet_overhead) {
 	const int BUF_SIZE = 128;
 	struct rte_mbuf* pkts[BUF_SIZE];
 	int send_buf_idx = 0;
@@ -67,12 +71,12 @@ void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue
 	uint32_t num_bad_bytes = 0;
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
-		// desired inter-frame spacing is encoded in the hash 'usr' field
+		// desired inter-frame spacing is encoded in the timestamp dynfield
 		uint32_t delay = (uint32_t) get_timestamp_dynfield(pkt);
 
 		// step 1: generate delay-packets
 		while (delay > 0) {
-			struct rte_mbuf* pkt = get_delay_pkt_bad_crc(pool, &delay, min_pkt_size);
+			struct rte_mbuf* pkt = get_delay_pkt_bad_crc(pool, &delay, min_pkt_size, packet_overhead);
 			if (pkt) {
 				num_bad_pkts++;
 				// packet size: [MAC, CRC] to be consistent with HW counters

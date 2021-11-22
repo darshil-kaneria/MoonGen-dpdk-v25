@@ -3,13 +3,14 @@ local pkt    = require "packet"
 local memory = require "memory"
 local ffi    = require "ffi"
 local log    = require "log"
+local dpdkc  = require "dpdkc"
 
 local txQueue = device.__txQueuePrototype
 local device = device.__devicePrototype
 local C = ffi.C
 
 ffi.cdef[[
-	void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint32_t min_pkt_size);
+	void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint32_t min_pkt_size, uint32_t packet_overhead);
 ]]
 
 local mempool
@@ -19,7 +20,9 @@ local mempool
 --   increases precision at low non-cbr rates
 -- @param n optional, number of packets to send (defaults to full bufs)
 function txQueue:sendWithDelay(bufs, targetRate, n)
-	if not self.dev.crcPatch then
+	-- check if CRC checksums can be disabled
+	-- on e810 NICs packets with an incorrect Ethernet length field can be used
+	if not self.dev.crcPatch and not self.dev.e810 then
 		log:fatal("Driver does not support disabling the CRC flag. This feature requires a patched driver.")
 	end
 	targetRate = targetRate or 14.88
@@ -31,19 +34,25 @@ function txQueue:sendWithDelay(bufs, targetRate, n)
 			-- the actual contents of the packets don't matter since their CRC is invalid anways
 			local pkt = buf:getTcpPacket()
 			pkt:fill()
+
+			-- use packets with wrong ethenet length field on e810 NICs instead
+			if self.dev.e810 then
+				pkt.eth:setType(1)
+			end
 		end
 	}
 	n = n or bufs.size
-	local avgPacketSize = 1.25 / (targetRate * 2) * 1000
 	local minPktSize = self.dev.minPacketSize or 64
 	local maxPktRate = self.dev.maxPacketRate or 14.88
+	local pktOverhead = self.dev.packetOverhead or 20
+	local lineRate = self.dev.lineRate or 10
 	-- allow smaller packets at low rates
 	if targetRate < maxPktRate / 2 then
-		minPktSize = minPktSize + 20
+		minPktSize = minPktSize + pktOverhead
 	else
-		minPktSize = math.floor(10 * 10^9 / 10^6 / 8 / maxPktRate)
+		minPktSize = math.floor(lineRate * 10^9 / 10^6 / 8 / maxPktRate)
 	end
-	C.moongen_send_all_packets_with_delay_bad_crc(self.id, self.qid, bufs.array, n, mempool, minPktSize)
+	C.moongen_send_all_packets_with_delay_bad_crc(self.id, self.qid, bufs.array, n, mempool, minPktSize, pktOverhead)
 	return bufs.size
 end
 
@@ -54,9 +63,11 @@ function pkt:setDelay(delay)
 end
 
 --- sets the delay (cf. pkt:setDelay) to match a given packet rate in Mpps
-function pkt:setRate(rate)
-	
-	dpdkc.set_timestamp_dynfield(self, 10^10 / 8 / (rate * 10^6) - self.pkt_len - 24)
+--- the second parameter specifies the rate of the used NIC in Gbps
+--- (when this parameter is not specified a 10Gb NIC is assumed)
+function pkt:setRate(rate, lineRate)		
+	lineRate = lineRate or 10
+	dpdkc.set_timestamp_dynfield(self, lineRate * 10^9 / 8 / (rate * 10^6) - self.pkt_len - 24)
 end
 
 ffi.cdef[[
