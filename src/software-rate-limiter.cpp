@@ -64,7 +64,7 @@ namespace rate_limiter {
 			}
 			if (n) {
 				for (int i = 0; i < cur_batch_size; i++) {
-					// desired inter-frame spacing is encoded in the udata field (bytes on the wire)
+					// desired inter-frame spacing is encoded in the timestamping dynfield (bytes on the wire)
 					id_cycles = ((uint64_t) get_timestamp_dynfield(bufs[i]) * 8 / link_bps) * tsc_hz;
 					next_send += id_cycles;
 					while ((cur = rte_get_tsc_cycles()) < next_send);
