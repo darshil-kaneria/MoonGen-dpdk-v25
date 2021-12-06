@@ -100,30 +100,3 @@ void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue
 	__sync_fetch_and_add(&bad_bytes_sent[port_id], num_bad_bytes);
 	return;
 }
-
-uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay) {	
-	//calculate delay based on the delay value, the receive tiestamp and the current transmit offset
-	for (uint16_t i = 0; i < num_pkts; i++) {
-		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);
-		struct rte_mbuf* pkt = load_pkts[i];
-		uint64_t goal_sending_time = get_timestamp_dynfield(pkt) + delay;
-
-		//printf("%lu,", goal_sending_time);
-
-		if(goal_sending_time < current_sending_time){
-			set_timestamp_dynfield(pkt, 0);
-			printf("delay not possible: sending immediately\n");
-		}else{
-			uint64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
-			//if(i==0)printf("delay: %lu\n", goal_sending_time-current_sending_time);
-			set_timestamp_dynfield(pkt, delayBytes);
-			//printf("%d\n", delayBytes);
-			currentByteOffset += pkt->data_len + 24 + delayBytes;
-		}
-	}
-
-	// send batch of packets with modified delay values
-	moongen_send_all_packets_with_delay_bad_crc(port_id, queue_id, load_pkts, num_pkts, pool, 64, 24);
-
-	return currentByteOffset;
-}

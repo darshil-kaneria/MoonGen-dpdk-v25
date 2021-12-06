@@ -11,7 +11,7 @@ local barrier= require "barrier"
 local pipe   = require "pipe"
 local ffi	 = require "ffi"
 
-local C = ffi.C
+local wire = ffi.load("wire")
 
 function configure(parser)
 	parser:description("Simulates a wire. Forwards the packets from one port to the other with the same spacing and a configurable delay.")
@@ -21,7 +21,7 @@ function configure(parser)
 end
 
 function master(args)
-	local dev1 = device.config({port = args.dev[1], rxQueues = 2, txQueues = 2, txDescs = 4096, numBufs = 100000})
+	local dev1 = device.config({port = args.dev[1], rxQueues = 2, txQueues = 2, txDescs = 4096, numBufs = 5000000})
 	local dev2 = device.config({port = args.dev[2], rxQueues = 2, txQueues = 2})
 	device.waitForLinks()
 
@@ -37,10 +37,10 @@ function master(args)
 	
     mg.startTask("transmitter", dev1:getTxQueue(0), barrierReadTs, timingPipe, barrierStartReceive, packetPipe, args)
 	mg.startTask("timestamper", dev1, barrierReadTs, timingPipe, barrierStartReceive, packetPipe)
-	mg.startTask("receiver", dev1:getRxQueue(0), barrierStartReceive, packetPipe)	
-	mg.sleepMillisIdle(3000)
-	mg.startTask("testReceiver", dev2:getRxQueue(0))
-	mg.startTask("testTransmitter", dev2:getTxQueue(0))
+	mg.startTask("receiver", dev2:getRxQueue(0), barrierStartReceive, packetPipe)	
+	--mg.sleepMillisIdle(3000)
+	--mg.startTask("testReceiver", dev2:getRxQueue(0))
+	--mg.startTask("testTransmitter", dev2:getTxQueue(0))
     mg.waitForTasks()
 end
 
@@ -84,8 +84,7 @@ function receiver(queue, barrierStartReceive, packetPipe)
 			local d = memory.alloc("struct received_packets*", ffi.sizeof("struct received_packets"))
 			d.bufs = bufs.array
 			d.count = rx
-			print(bufs[1]:getTimestamp(queue.dev))
-			print("#")
+			local ts = bufs[1]:getTimestamp(queue.dev)
 			packetPipe:send(d)
 		end
 	end
@@ -102,8 +101,8 @@ function timestamper(dev, barrierReadTs, timingPipe, barrierStartReceive)
 end
 
 function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, packetPipe, args)
-	local INV_SIZE = 1500
-	local DELAY_BATCH_SIZE = 128
+	local INV_SIZE = 9000
+	local DELAY_BATCH_SIZE = 512
 
     -- mempool with invalid packets
     local memInv = memory.createMemPool({n = 8096, func=function(buf)
@@ -119,11 +118,11 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 	local probePacket = true
 
 	-- startup
-	local startupTimer = timer:new(1)
-	while startupTimer:running() do
-		delayBufArray:alloc(INV_SIZE)
-		queue:send(delayBufArray)
-	end
+	--local startupTimer = timer:new(1)
+	--while startupTimer:running() do
+	--	delayBufArray:alloc(INV_SIZE)
+	--	queue:send(delayBufArray)
+	--end
 	
 	-- send delay probing packet and wait
 	local probingTimer = timer:new(1)
@@ -166,7 +165,7 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 		if receivedValue ~= nil then
 			-- send packets with delay
 			local data = ffi.cast("struct received_packets*", receivedValue)
-			currentByteOffset = C.moongen_send_all_delay_offset_e810(queue.dev.id, queue.qid, data.bufs, data.count, memInv, currentByteOffset, firstPacketTimestamp, args.delay)
+			currentByteOffset = wire.moongen_send_all_delay_offset_e810(queue.dev.id, queue.qid, data.bufs, data.count, memInv, currentByteOffset, firstPacketTimestamp, args.delay)
 		else
 			-- just send delay
 			delayBufArray:alloc(INV_SIZE)
