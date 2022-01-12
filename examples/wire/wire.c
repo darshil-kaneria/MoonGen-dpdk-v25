@@ -3,6 +3,7 @@
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
+#include <rte_ring.h>
 
 #include "device.h"
 #include "timestamping.h"
@@ -11,59 +12,44 @@
     modfied code from the Moongen crc rate limiting code
 */
 
-static struct rte_mbuf* get_delay_pkt_bad_crc_wire(struct rte_mempool* pool, uint64_t* rem_delay, uint32_t min_pkt_size, uint32_t packet_overhead) {
-	// _Thread_local support seems to suck in (older?) gcc versions?
-	// this should give us the best compatibility
-	static __thread uint64_t remainingDelay = 0;
-	uint64_t delay = *rem_delay;
+const uint64_t INV_SIZE = 9000;
+const uint64_t DELAY_BATCH_SIZE = 1024;
+const uint64_t MIN_PACKET_SIZE = 64;
+const uint64_t PACKET_OVERHEAD = 24;
 
-	// add delay
-	if (delay < min_pkt_size + packet_overhead) {
-        remainingDelay += delay;
-		*rem_delay = 0;
-		return NULL;
-	}
-
+static struct rte_mbuf* get_delay_pkt_bad_crc_wire(struct rte_mempool* pool, uint64_t delay) {
 	// calculate the optimimum packet size
-	if (delay < 9000) {
+	if (delay <= 9000) {
 		delay = delay;
 	} else if (delay > 15000) {
-		// 2000 is an arbitrary chosen value as it doesn't really matter
-		// we just need to avoid doing something stupid for packet sizes that are just over 1538 bytes
+		// 15000 is an arbitrary chosen value as it doesn't really matter
+		// we just need to avoid doing something stupid for packet sizes that are just over 9000 bytes
 		delay = 9000;
 	} else {
 		// delay between 9000 and 15000
 		delay = delay / 2;
 	}
 
-	*rem_delay -= delay;
 	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pool);
-
-	// account for preamble, sfd, and ifg (CRC is disabled)
-	pkt->data_len = delay - packet_overhead;
-	pkt->pkt_len = delay - packet_overhead;
-
+	pkt->data_len = delay - PACKET_OVERHEAD;
+	pkt->pkt_len = delay - PACKET_OVERHEAD;
 	return pkt;
 }
 
-void moongen_send_all_packets_with_delay_bad_crc_wire(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool, uint32_t min_pkt_size, uint32_t packet_overhead) {
-	const int BUF_SIZE = 512;
+void moongen_send_all_packets_with_delay_bad_crc_wire(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool) {
+	const int BUF_SIZE = 1024;
 	struct rte_mbuf* pkts[BUF_SIZE];
 	int send_buf_idx = 0;
-	uint64_t num_bad_pkts = 0;
-	uint64_t num_bad_bytes = 0;
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
 		// desired inter-frame spacing is encoded in the timestamp dynfield
 		uint64_t delay = get_timestamp_dynfield(pkt);
 
 		// step 1: generate delay-packets
-		while (delay > 0) {
-			struct rte_mbuf* pkt = get_delay_pkt_bad_crc_wire(pool, &delay, min_pkt_size, packet_overhead);
+		while (delay >= MIN_PACKET_SIZE + PACKET_OVERHEAD) {
+			struct rte_mbuf* pkt = get_delay_pkt_bad_crc_wire(pool, delay);
 			if (pkt) {
-				num_bad_pkts++;
-				// packet size: [MAC, CRC] to be consistent with HW counters
-				num_bad_bytes += pkt->pkt_len;
+				delay -= pkt->pkt_len + PACKET_OVERHEAD;
 				pkts[send_buf_idx++] = pkt;
 			}
 			if (send_buf_idx >= BUF_SIZE) {
@@ -78,29 +64,67 @@ void moongen_send_all_packets_with_delay_bad_crc_wire(uint8_t port_id, uint16_t 
 			send_buf_idx = 0;
 		}
 	}
-	return;
 }
 
 uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay) {	
 	//calculate delay based on the delay value, the receive tiestamp and the current transmit offset
 	for (uint16_t i = 0; i < num_pkts; i++) {
-		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);
 		struct rte_mbuf* pkt = load_pkts[i];
-		
+
+		//printf("RX timestamp: %ld\n", get_timestamp_dynfield(pkt));
+
+		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);		
 		uint64_t goal_sending_time = get_timestamp_dynfield(pkt) + delay;
 
+		currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
+
 		if(goal_sending_time < current_sending_time){
+			//printf("goal: %ld, current: %ld\n", goal_sending_time, current_sending_time);
 			set_timestamp_dynfield(pkt, 0);
-			printf("delay not possible: sending immediately\n");
+			continue;
+		}
+		
+		int64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
+		if(delayBytes < MIN_PACKET_SIZE + PACKET_OVERHEAD){
+			// delay bytes not possible => send packet immediately
+			set_timestamp_dynfield(pkt, 0);
 		}else{
-			uint64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
 			set_timestamp_dynfield(pkt, delayBytes);
-			currentByteOffset += pkt->data_len + 24 + delayBytes;
+			currentByteOffset += delayBytes;
 		}
 	}
 
 	// send batch of packets with modified delay values
-	moongen_send_all_packets_with_delay_bad_crc_wire(port_id, queue_id, load_pkts, num_pkts, pool, 64, 24);
+	moongen_send_all_packets_with_delay_bad_crc_wire(port_id, queue_id, load_pkts, num_pkts, pool);
 
 	return currentByteOffset;
+}
+
+void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, uint16_t pkt_len);
+
+
+
+void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay){
+	struct rte_mbuf* load_pkts[64];
+	while(1){
+		uint64_t rx = rte_ring_sc_dequeue_burst(packet_ring, (void**)load_pkts, 64, NULL);
+		if(rx>0){
+			currentByteOffset = moongen_send_all_delay_offset_e810(port_id, queue_id, load_pkts, rx, pool, currentByteOffset, firstPacketTimestamp, delay);
+		}else{
+			struct rte_mbuf* invalid_packets[DELAY_BATCH_SIZE];
+			alloc_mbufs(pool, invalid_packets, DELAY_BATCH_SIZE, INV_SIZE);
+			dpdk_send_all_packets(port_id, queue_id, invalid_packets, DELAY_BATCH_SIZE);
+			currentByteOffset += DELAY_BATCH_SIZE * (INV_SIZE + 24);
+		}
+	}
+}
+
+void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring){
+	struct rte_mbuf* rx_pkts[64];
+	while(1) {
+		uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, 64);
+		if(rx>0){
+			rte_ring_sp_enqueue_bulk(packet_ring, (void**)rx_pkts, rx, NULL);
+		}
+	}
 }
