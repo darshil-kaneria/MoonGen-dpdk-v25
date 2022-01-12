@@ -131,10 +131,12 @@ namespace moonsniff {
 			uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
 
 			for (int i = 0; i < rx; i++) {
-				if ((rx_pkts[i]->ol_flags | PKT_RX_IEEE1588_TMST) != 0) {
+
+				// the DPDK ice driver does not set the TX Timestamp flag => just assume a timestamp was taken for E810 NICs
+				if (embeddedTimestampInPacket | ((rx_pkts[i]->ol_flags & RTE_MBUF_F_RX_IEEE1588_TMST) != 0)) {
 					uint64_t timestamp;
 					if(embeddedTimestampInPacket){
-						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
+						//on ice NICs the timestamp is stored in the timestamp dynfield
 						timestamp = get_timestamp_dynfield(rx_pkts[i]);
 					}else{
 						//timestamp on ixgbe NICs is in the end of the packet data
@@ -227,7 +229,8 @@ namespace moonsniff {
 			uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
 
 			for (int i = 0; i < rx; i++) {
-				if ((rx_pkts[i]->ol_flags | PKT_RX_IEEE1588_TMST) != 0) {
+				// the DPDK ice driver does not set the TX Timestamp flag => just assume a timestamp was taken for E810 NICs
+				if (embeddedTimestampInPacket | ((rx_pkts[i]->ol_flags & RTE_MBUF_F_RX_IEEE1588_TMST) != 0)) {
 					uint32_t incl_len = (rx_pkts[i]->pkt_len - packetLengthAdjust < snap_len) ? rx_pkts[i]->pkt_len - packetLengthAdjust : snap_len;
 					if ((size_t)(offset + rx_pkts[i]->pkt_len + 8) >= size) {
 						ftruncate(fd, 2*size);
@@ -242,7 +245,7 @@ namespace moonsniff {
 					uint32_t low;
 					uint32_t high;
 					if(embeddedTimestampInPacket){
-						//on ice NICs the timestamp is stored (by the modified dpdk driver) in the timestamp dynfield
+						//on ice NICs the timestamp is stored in the timestamp dynfield
 						uint64_t timestamp64 = get_timestamp_dynfield(rx_pkts[i]);
 						low = timestamp64 % 1000000000;
 						high = timestamp64 / 1000000000;

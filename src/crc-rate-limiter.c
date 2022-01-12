@@ -56,7 +56,7 @@ static struct rte_mbuf* get_delay_pkt_bad_crc(struct rte_mempool* pool, uint32_t
 	pkt->pkt_len = delay - packet_overhead;
 
 	//disable crc checksum for this packet. This will be ignored on e810 NICs
-	pkt->ol_flags |= PKT_TX_NO_CRC_CSUM;
+	pkt->ol_flags |= RTE_MBUF_F_TX_NO_CRC_CSUM;
 
 	current += delay;
 	return pkt;
