@@ -38,9 +38,6 @@ function master(args)
     mg.startTask("transmitter", dev2:getTxQueue(0), barrierReadTs, timingPipe, barrierStartReceive, packetRing, args)
 	mg.startTask("timestamper", dev2, barrierReadTs, timingPipe, barrierStartReceive, packetRing)
 	mg.startTask("receiver", dev1:getRxQueue(0), barrierStartReceive, packetRing)	
-	--mg.sleepMillisIdle(3000)
-	--mg.startTask("testReceiver", dev2:getRxQueue(0))
-	--mg.startTask("testTransmitter", dev2:getTxQueue(0))
     mg.waitForTasks()
 end
 

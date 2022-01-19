@@ -71,15 +71,12 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
 
-		//printf("RX timestamp: %ld\n", get_timestamp_dynfield(pkt));
-
 		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);		
 		uint64_t goal_sending_time = get_timestamp_dynfield(pkt) + delay;
 
 		currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
 
 		if(goal_sending_time < current_sending_time){
-			//printf("goal: %ld, current: %ld\n", goal_sending_time, current_sending_time);
 			set_timestamp_dynfield(pkt, 0);
 			continue;
 		}
@@ -101,8 +98,6 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 }
 
 void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, uint16_t pkt_len);
-
-
 
 void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay){
 	struct rte_mbuf* load_pkts[64];
