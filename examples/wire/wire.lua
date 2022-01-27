@@ -10,6 +10,7 @@ local dpdk 	 = require "dpdk"
 local barrier= require "barrier"
 local pipe   = require "pipe"
 local ffi	 = require "ffi"
+local dpdkc	 = require "dpdkc"
 
 local wire = ffi.load("build/wire")
 
@@ -17,11 +18,16 @@ function configure(parser)
 	parser:description("Simulates a wire. Forwards the packets from one port to the other with the same spacing and a configurable delay.")
 	parser:argument("dev", "Devices to use."):args(2):convert(tonumber)
 	parser:option("-d --delay", "The forwarding delay (in ms)."):convert(tonumber):default(10)
+	parser:flag("-f --fast", "Optmizes for high packet rate, but decreases delay accuracy.")
 	parser:option("-o --output", "File to output statistics to")
 end
 
 function master(args)
-	local dev1 = device.config({port = args.dev[1], rxQueues = 1, txQueues = 1, numBufs = 7000000})
+	if args.fast then
+		dpdkc.rte_vect_set_max_simd_bitwidth(512)
+	end
+
+	local dev1 = device.config({port = args.dev[1], rxQueues = 1, txQueues = 1, numBufs = 7000000, txDescs = 4096, disableOffloads = args.fast})
 	local dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096})
 	device.waitForLinks()
 
@@ -34,16 +40,18 @@ function master(args)
 
 	local timingPipe = pipe:newFastPipe()
 	local packetRing = pipe:newPacketRing(8388608)
-	
+
     mg.startTask("transmitter", dev2:getTxQueue(0), barrierReadTs, timingPipe, barrierStartReceive, packetRing, args)
-	mg.startTask("timestamper", dev2, barrierReadTs, timingPipe, barrierStartReceive, packetRing)
+	if not args.fast then
+		mg.startTask("timestamper", dev2, barrierReadTs, timingPipe, barrierStartReceive, packetRing)
+	end
 	mg.startTask("receiver", dev1:getRxQueue(0), barrierStartReceive, packetRing)	
     mg.waitForTasks()
 end
 
 ffi.cdef[[
 	void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring);
-	void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay);
+	void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast);
 	uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay);
 	]]
 
@@ -64,7 +72,7 @@ end
 
 function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, packetRing, args)
 	local INV_SIZE = 9000
-	local DELAY_BATCH_SIZE = 2048
+	local DELAY_BATCH_SIZE = 128
 
     -- mempool with invalid packets
     local memInv = memory.createMemPool({n = 8096, func=function(buf)
@@ -74,7 +82,7 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 	end})
 
 	local delayBufArray = memInv:bufArray(DELAY_BATCH_SIZE)
-	
+
 	local currentByteOffset = 0
 	local firstPacketTimestamp = 0
 	local probePacket = true
@@ -88,39 +96,41 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 
 	-- start receiver
 	barrierStartReceive:wait()
-	
-	-- send delay probing packet and wait
-	local probingTimer = timer:new(1)
-	while probingTimer:running() do
-		delayBufArray:alloc(INV_SIZE)
-		if probePacket then
-			delayBufArray[1].ol_flags = bit.bor(delayBufArray[1].ol_flags, dpdk.PKT_TX_IEEE1588_TMST)
-			probePacket = false
-		else
-			delayBufArray[1].ol_flags = bit.band(delayBufArray[1].ol_flags, bit.bnot(dpdk.PKT_TX_IEEE1588_TMST))
+
+	if not args.fast then
+		-- send delay probing packet and wait
+		local probingTimer = timer:new(1)
+		while probingTimer:running() do
+			delayBufArray:alloc(INV_SIZE)
+			if probePacket then
+				delayBufArray[1].ol_flags = bit.bor(delayBufArray[1].ol_flags, dpdk.PKT_TX_IEEE1588_TMST)
+				probePacket = false
+			else
+				delayBufArray[1].ol_flags = bit.band(delayBufArray[1].ol_flags, bit.bnot(dpdk.PKT_TX_IEEE1588_TMST))
+			end
+
+			queue:send(delayBufArray)
+			currentByteOffset = currentByteOffset + DELAY_BATCH_SIZE * (INV_SIZE + 24)
 		end
 
-		queue:send(delayBufArray)
-		currentByteOffset = currentByteOffset + DELAY_BATCH_SIZE * (INV_SIZE + 24)
-	end
+		-- request TX timestamp from timestamping thread 
+		barrierReadTs:wait()
 
-	-- request TX timestamp from timestamping thread 
-	barrierReadTs:wait()
+		-- wait for timing information from other thread
+		while mg.running() do
+			delayBufArray:alloc(INV_SIZE)
+			queue:send(delayBufArray)
+			currentByteOffset = currentByteOffset + DELAY_BATCH_SIZE * (INV_SIZE + 24)
 
-	-- wait for timing information from other thread
-	while mg.running() do
-		delayBufArray:alloc(INV_SIZE)
-		queue:send(delayBufArray)
-		currentByteOffset = currentByteOffset + DELAY_BATCH_SIZE * (INV_SIZE + 24)
-
-		local receivedValue = timingPipe:tryRecv(0)
-		if receivedValue ~= nil then
-			local data = ffi.cast("uint32_t*", receivedValue)
-			firstPacketTimestamp = data[1]
-			break
+			local receivedValue = timingPipe:tryRecv(0)
+			if receivedValue ~= nil then
+				local data = ffi.cast("uint32_t*", receivedValue)
+				firstPacketTimestamp = data[1]
+				break
+			end
 		end
 	end
 
 	-- start transmitter
-	wire.transmitter_loop(queue.dev.id, queue.qid, packetRing.ring, memInv, currentByteOffset, firstPacketTimestamp, args.delay);
+	wire.transmitter_loop(queue.dev.id, queue.qid, packetRing.ring, memInv, currentByteOffset, firstPacketTimestamp, args.delay, args.fast or false);
 end

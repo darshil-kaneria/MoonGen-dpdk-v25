@@ -8,12 +8,14 @@
 #include "device.h"
 #include "timestamping.h"
 
+uint64_t ice_read_current_timer(int port);
+
 /*
     modfied code from the Moongen crc rate limiting code
 */
 
 const uint64_t INV_SIZE = 9000;
-const uint64_t DELAY_BATCH_SIZE = 1024;
+const uint64_t DELAY_BATCH_SIZE = 128;
 const uint64_t MIN_PACKET_SIZE = 64;
 const uint64_t PACKET_OVERHEAD = 24;
 
@@ -37,7 +39,7 @@ static struct rte_mbuf* get_delay_pkt_bad_crc_wire(struct rte_mempool* pool, uin
 }
 
 void moongen_send_all_packets_with_delay_bad_crc_wire(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct rte_mempool* pool) {
-	const int BUF_SIZE = 1024;
+	const int BUF_SIZE = 128;
 	struct rte_mbuf* pkts[BUF_SIZE];
 	int send_buf_idx = 0;
 	for (uint16_t i = 0; i < num_pkts; i++) {
@@ -99,7 +101,9 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 
 void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, uint16_t pkt_len);
 
-void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay){
+void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast){
+	if(fast) firstPacketTimestamp = ice_read_current_timer(port_id);
+	
 	struct rte_mbuf* load_pkts[64];
 	while(1){
 		uint64_t rx = rte_ring_sc_dequeue_burst(packet_ring, (void**)load_pkts, 64, NULL);
@@ -115,9 +119,9 @@ void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packe
 }
 
 void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring){
-	struct rte_mbuf* rx_pkts[64];
+	struct rte_mbuf* rx_pkts[512];
 	while(1) {
-		uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, 64);
+		uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, 512);
 		if(rx>0){
 			rte_ring_sp_enqueue_bulk(packet_ring, (void**)rx_pkts, rx, NULL);
 		}
