@@ -5,7 +5,7 @@ local ts     = require "timestamping"
 local stats  = require "stats"
 local hist   = require "histogram"
 
-local PKT_SIZE	= 60
+local PKT_SIZE	= 64
 local ETH_DST	= "12:13:14:15:16:17"
 
 local function getRstFile(...)
@@ -31,8 +31,8 @@ function master(args)
 	local dev1 = device.config({port = args.dev1, rxQueues = 2, txQueues = 2})
 	local dev2 = device.config({port = args.dev2, rxQueues = 2, txQueues = 2})
 	device.waitForLinks()
-	dev1:getTxQueue(0):setRate(args.rate)
-	dev2:getTxQueue(0):setRate(args.rate)
+	dev1:getTxQueue(0):setRate(args.rate, PKT_SIZE)
+	dev2:getTxQueue(0):setRate(args.rate, PKT_SIZE)
 	mg.startTask("loadSlave", dev1:getTxQueue(0))
 	if dev1 ~= dev2 then
 		mg.startTask("loadSlave", dev2:getTxQueue(0))
