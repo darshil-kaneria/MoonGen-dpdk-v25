@@ -40,7 +40,7 @@ function master(args)
 	-- max 1kpps timestamping traffic timestamping
 	-- rate will be somewhat off for high-latency links at low rates
 	if args.rate > 0 then
-		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000)
+		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000, args.size)
 	end
 	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, args.flows)
 	mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, args.flows)
@@ -55,7 +55,7 @@ end
 
 local function fillUdpPacket(buf, len)
 	buf:getUdpPacket():fill{
-		ethSrc = queue,
+		ethSrc = nil, -- default ethernet source
 		ethDst = DST_MAC,
 		ip4Src = SRC_IP,
 		ip4Dst = DST_IP,

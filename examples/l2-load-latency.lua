@@ -45,7 +45,7 @@ end
 function loadSlave(queue)
 	local mem = memory.createMemPool(function(buf)
 		buf:getEthernetPacket():fill{
-			ethSrc = txDev,
+			ethSrc = nil, -- default ethernet source
 			ethDst = ETH_DST,
 			ethType = 0x1234
 		}
