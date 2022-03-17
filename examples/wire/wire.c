@@ -44,6 +44,10 @@ void moongen_send_all_packets_with_delay_bad_crc_wire(uint8_t port_id, uint16_t 
 	int send_buf_idx = 0;
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
+
+		// skip deleted packets
+		if(pkt == NULL)continue;
+
 		// desired inter-frame spacing is encoded in the timestamp dynfield
 		uint64_t delay = get_timestamp_dynfield(pkt);
 
@@ -76,14 +80,24 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);		
 		uint64_t goal_sending_time = get_timestamp_dynfield(pkt) + delay;
 
-		currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
+		int64_t sending_time_diff = goal_sending_time - current_sending_time;
+		if(sending_time_diff < 0){
+			// if the packet is signigicantly late -> drop it
+			if(sending_time_diff < -100){
+				rte_pktmbuf_free(pkt);
+				load_pkts[i] = NULL;
+				continue;
+			}
 
-		if(goal_sending_time < current_sending_time){
+			// for packets which are slightly to late (e.g. due to measurement error) -> send without delay
 			set_timestamp_dynfield(pkt, 0);
+			currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
 			continue;
 		}
+
+		currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
 		
-		int64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
+		uint64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
 		if(delayBytes < MIN_PACKET_SIZE + PACKET_OVERHEAD){
 			// delay bytes not possible => send packet immediately
 			set_timestamp_dynfield(pkt, 0);
