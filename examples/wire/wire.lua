@@ -27,7 +27,7 @@ function master(args)
 		dpdkc.rte_vect_set_max_simd_bitwidth(512)
 	end
 
-	local dev1 = device.config({port = args.dev[1], rxQueues = 1, txQueues = 1, numBufs = 100000, txDescs = 4096, disableOffloads = args.fast})
+	local dev1 = device.config({port = args.dev[1], rxQueues = 1, txQueues = 1, numBufs = 7000000, txDescs = 4096, disableOffloads = args.fast})
 	local dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096})
 	device.waitForLinks()
 
