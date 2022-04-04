@@ -19,6 +19,12 @@ const uint64_t DELAY_BATCH_SIZE = 128;
 const uint64_t MIN_PACKET_SIZE = 64;
 const uint64_t PACKET_OVERHEAD = 24;
 
+// for 100G
+const double NANOSECONDS_PER_BYTE = 0.08;
+
+// for 10G
+//const double NANOSECONDS_PER_BYTE = 0.8;
+
 static struct rte_mbuf* get_delay_pkt_bad_crc_wire(struct rte_mempool* pool, uint64_t delay) {
 	// calculate the optimimum packet size
 	if (delay <= 9000) {
@@ -77,7 +83,7 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 	for (uint16_t i = 0; i < num_pkts; i++) {
 		struct rte_mbuf* pkt = load_pkts[i];
 
-		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * 0.08);		
+		uint64_t current_sending_time = firstPacketTimestamp + (currentByteOffset * NANOSECONDS_PER_BYTE);
 		uint64_t goal_sending_time = get_timestamp_dynfield(pkt) + delay;
 
 		int64_t sending_time_diff = goal_sending_time - current_sending_time;
@@ -97,7 +103,7 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 
 		currentByteOffset += pkt->pkt_len + PACKET_OVERHEAD;
 		
-		uint64_t delayBytes = (goal_sending_time - current_sending_time) / 0.08;
+		uint64_t delayBytes = (goal_sending_time - current_sending_time) / NANOSECONDS_PER_BYTE;
 		if(delayBytes < MIN_PACKET_SIZE + PACKET_OVERHEAD){
 			// delay bytes not possible => send packet immediately
 			set_timestamp_dynfield(pkt, 0);
@@ -115,8 +121,11 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 
 void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, uint16_t pkt_len);
 
-void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast){
-	if(fast) firstPacketTimestamp = ice_read_current_timer(port_id);
+void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct rte_mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast, int64_t offset){
+	if(fast){
+		currentByteOffset = 0;
+		firstPacketTimestamp = ice_read_current_timer(port_id) + offset;
+	}
 	
 	struct rte_mbuf* load_pkts[64];
 	while(1){

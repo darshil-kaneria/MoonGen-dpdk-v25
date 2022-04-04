@@ -19,7 +19,8 @@ function configure(parser)
 	parser:argument("dev", "Devices to use."):args(2):convert(tonumber)
 	parser:option("-d --delay", "The forwarding delay (in ms)."):convert(tonumber):default(10)
 	parser:flag("-f --fast", "Optmizes for high packet rate, but decreases delay accuracy.")
-	parser:option("-o --output", "File to output statistics to")
+	parser:flag("-m --measure", "Measure the time between calling the transmit function and the packet beeing transmitted on the wire. (Used as offset with the fast mode)")
+	parser:option("-o --offset", "Offset to use between the SW timestamp and the transmitted packet when using fast mode."):convert(tonumber):default(0)
 end
 
 function master(args)
@@ -28,7 +29,13 @@ function master(args)
 	end
 
 	local dev1 = device.config({port = args.dev[1], rxQueues = 1, txQueues = 1, numBufs = 7000000, txDescs = 4096, disableOffloads = args.fast})
-	local dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096})
+
+	local dev2 = nil
+	if args.dev[1] ~= args.dev[2] then
+		dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096})
+	else
+		dev2 = dev1
+	end
 	device.waitForLinks()
 
 	--stats.startStatsTask{dev1, dev2}
@@ -51,7 +58,7 @@ end
 
 ffi.cdef[[
 	void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring);
-	void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast);
+	void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast, int64_t offset);
 	uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay);
 	]]
 
@@ -85,6 +92,7 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 
 	local currentByteOffset = 0
 	local firstPacketTimestamp = 0
+	local firstPacketTimestampSW = 0
 	local probePacket = true
 	
 	-- startup
@@ -105,6 +113,10 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 			if probePacket then
 				delayBufArray[1].ol_flags = bit.bor(delayBufArray[1].ol_flags, dpdk.PKT_TX_IEEE1588_TMST)
 				probePacket = false
+
+				if args.measure then
+					firstPacketTimestampSW = dpdkc.ice_read_current_timer(queue.dev.id)
+				end
 			else
 				delayBufArray[1].ol_flags = bit.band(delayBufArray[1].ol_flags, bit.bnot(dpdk.PKT_TX_IEEE1588_TMST))
 			end
@@ -131,6 +143,12 @@ function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, pack
 		end
 	end
 
+	if args.measure then
+		local offset = ffi.cast("int64_t",firstPacketTimestamp)-ffi.cast("int64_t",firstPacketTimestampSW)
+		print("Measured offset: "..tostring(offset))
+		print("Terminate this script and set the offset parameter to this value when using fast mode")
+	end
+
 	-- start transmitter
-	wire.transmitter_loop(queue.dev.id, queue.qid, packetRing.ring, memInv, currentByteOffset, firstPacketTimestamp, args.delay, args.fast or false);
+	wire.transmitter_loop(queue.dev.id, queue.qid, packetRing.ring, memInv, currentByteOffset, firstPacketTimestamp, args.delay, args.fast or false, args.offset or 0);
 end
