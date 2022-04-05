@@ -14,16 +14,25 @@ uint64_t ice_read_current_timer(int port);
     modfied code from the Moongen crc rate limiting code
 */
 
-const uint64_t INV_SIZE = 9000;
-const uint64_t DELAY_BATCH_SIZE = 128;
-const uint64_t MIN_PACKET_SIZE = 64;
-const uint64_t PACKET_OVERHEAD = 24;
+static uint64_t INV_SIZE = 9000;
+static uint64_t DELAY_BATCH_SIZE = 128;
+static uint64_t RECV_BATCH_SIZE = 512;
+static uint64_t MIN_PACKET_SIZE = 64;
+static uint64_t PACKET_OVERHEAD = 24;
 
 // for 100G
-const double NANOSECONDS_PER_BYTE = 0.08;
+static double NANOSECONDS_PER_BYTE = 0.08;
 
-// for 10G
-//const double NANOSECONDS_PER_BYTE = 0.8;
+void setOtherRate(uint64_t rate){
+	// special parameters for 10G links
+	// other link speeds (other than 100G) were not tested
+	if(rate == 10000){
+		INV_SIZE = 1500;
+		DELAY_BATCH_SIZE = 64;
+		RECV_BATCH_SIZE = 64;
+	}
+	NANOSECONDS_PER_BYTE *= (100000.0/rate);
+}
 
 static struct rte_mbuf* get_delay_pkt_bad_crc_wire(struct rte_mempool* pool, uint64_t delay) {
 	// calculate the optimimum packet size
@@ -89,7 +98,7 @@ uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, 
 		int64_t sending_time_diff = goal_sending_time - current_sending_time;
 		if(sending_time_diff < 0){
 			// if the packet is signigicantly late -> drop it
-			if(sending_time_diff < -100){
+			if(sending_time_diff < -10000){
 				rte_pktmbuf_free(pkt);
 				load_pkts[i] = NULL;
 				continue;
@@ -142,9 +151,9 @@ void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packe
 }
 
 void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring){
-	struct rte_mbuf* rx_pkts[512];
+	struct rte_mbuf* rx_pkts[RECV_BATCH_SIZE];
 	while(1) {
-		uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, 512);
+		uint16_t rx = rte_eth_rx_burst(port_id, queue_id, rx_pkts, RECV_BATCH_SIZE);
 		if(rx>0){
 			rte_ring_sp_enqueue_bulk(packet_ring, (void**)rx_pkts, rx, NULL);
 		}

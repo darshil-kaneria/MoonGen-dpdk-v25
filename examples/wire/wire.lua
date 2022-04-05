@@ -32,13 +32,18 @@ function master(args)
 
 	local dev2 = nil
 	if args.dev[1] ~= args.dev[2] then
-		dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096})
+		dev2 = device.config({port = args.dev[2], rxQueues = 1, txQueues = 1, txDescs = 4096, disableOffloads = args.fast})
 	else
 		dev2 = dev1
 	end
 	device.waitForLinks()
 
-	--stats.startStatsTask{dev1, dev2}
+	local linkSpeed = dev2:getLinkStatus().speed
+	local INV_SIZE = 9000
+	if(linkSpeed ~= 100000) then
+		wire.setOtherRate(linkSpeed)
+		INV_SIZE = 512
+	end
 
 	args.delay = args.delay * 1e6
 	
@@ -48,7 +53,7 @@ function master(args)
 	local timingPipe = pipe:newFastPipe()
 	local packetRing = pipe:newPacketRing(8388608)
 
-    mg.startTask("transmitter", dev2:getTxQueue(0), barrierReadTs, timingPipe, barrierStartReceive, packetRing, args)
+    mg.startTask("transmitter", dev2:getTxQueue(0), barrierReadTs, timingPipe, barrierStartReceive, packetRing, args, INV_SIZE)
 	if not args.fast then
 		mg.startTask("timestamper", dev2, barrierReadTs, timingPipe, barrierStartReceive, packetRing)
 	end
@@ -60,6 +65,7 @@ ffi.cdef[[
 	void receiver_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring);
 	void transmitter_loop(uint8_t port_id, uint16_t queue_id, struct rte_ring* packet_ring, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay, bool fast, int64_t offset);
 	uint64_t moongen_send_all_delay_offset_e810(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint64_t currentByteOffset, uint64_t firstPacketTimestamp, uint64_t delay);
+	void setOtherRate(uint64_t rate);
 	]]
 
 function receiver(queue, barrierStartReceive, packetRing)
@@ -77,8 +83,7 @@ function timestamper(dev, barrierReadTs, timingPipe, barrierStartReceive)
 	timingPipe:send(d)
 end
 
-function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, packetRing, args)
-	local INV_SIZE = 9000
+function transmitter(queue, barrierReadTs, timingPipe, barrierStartReceive, packetRing, args, INV_SIZE)
 	local DELAY_BATCH_SIZE = 128
 
     -- mempool with invalid packets
