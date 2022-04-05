@@ -26,3 +26,7 @@ To execute the script (e.g. from port 0 to port 1) run the following command ins
     /root/moongen/build/MoonGen /root/moongen/examples/wire/wire.lua 0 1
 
 The default delay is 10 ms. It can be changed using the -d parameter.
+
+## Limitation
+The accurate transmission of packets at specific timestamps is based on a byte offset from a TX timestamped packet. Because of this, it is necessary that the transmitting port never runs out of packets. Because only a limited number of packet per second can be transmitted, this also limits the number of packets, which can be forwarded. If there are too many packets or the transmission of packets gets interrupted, the delay of all following packets will be higher than expected.
+Measures to decrease these unexpected interruptions and jitter will increase the number of packets, which can be forwarded. (e.g. noHz Kernel, other bootparameters to decrease jitter).
