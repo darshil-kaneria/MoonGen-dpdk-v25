@@ -100,4 +100,3 @@ void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue
 	__sync_fetch_and_add(&bad_bytes_sent[port_id], num_bad_bytes);
 	return;
 }
-
