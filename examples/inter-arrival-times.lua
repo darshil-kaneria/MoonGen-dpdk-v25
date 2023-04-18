@@ -22,7 +22,7 @@ function master(rxPort, waitTime)
 		local n = queue:recv(bufs)
 		for i = 1, n do
 			if timer:expired() then
-				local ts = bufs[i]:getTimestamp()
+				local ts = bufs[i]:getTimestamp(rxDev)
 				times[#times + 1] = ts
 			end
 		end
