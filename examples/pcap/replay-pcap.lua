@@ -7,7 +7,7 @@ local stats   = require "stats"
 local log     = require "log"
 local pcap    = require "pcap"
 local limiter = require "software-ratecontrol"
-local dkdpc   = require "dpdkc"
+local dpdkc   = require "dpdkc"
 
 function configure(parser)
 	parser:argument("dev", "Device to use."):args(1):convert(tonumber)
@@ -63,12 +63,15 @@ function replay(queue, file, loop, rateLimiter, multiplier, sleepTime)
 		else
 			if loop then
 				pcapFile:reset()
+				prev = 0
 			else
 				break
 			end
 		end
 		if rateLimiter then
-			rateLimiter:sendN(bufs, n)
+			if n > 0 then
+				rateLimiter:sendN(bufs, n)
+			end
 		else
 			queue:sendN(bufs, n)
 		end

@@ -76,7 +76,7 @@ function mod:new(queue, mode, delay)
 		ctl = memory.alloc("struct limiter_control*", ffi.sizeof("struct limiter_control"))
 	}, rateLimiter)
 	ffi.fill(obj.ctl, ffi.sizeof("struct limiter_control"))
-	mg.startTask("__MG_RATE_LIMITER_MAIN", obj.ring, queue.id, queue.qid, mode, delay, queue.dev:getLinkStatus().speed, obj.ctl)
+	mg.startTask("__MG_RATE_LIMITER_MAIN", obj.ring, queue.id, queue.qid, mode, delay, queue.dev:getLinkStatus().speed, obj.ctl, queue)
 	return obj
 end
 
