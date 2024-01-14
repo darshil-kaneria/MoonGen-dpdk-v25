@@ -5,7 +5,6 @@ local ts     = require "timestamping"
 local stats  = require "stats"
 local hist   = require "histogram"
 
-local PKT_SIZE	= 60
 local ETH_DST	= "12:13:14:15:16:17"
 
 local function getRstFile(...)
@@ -25,24 +24,25 @@ function configure(parser)
 	parser:argument("dev2", "Device to transmit/receive from."):convert(tonumber)
 	parser:option("-r --rate", "Transmit rate in Mbit/s."):default(10000):convert(tonumber)
 	parser:option("-f --file", "Filename of the latency histogram."):default("histogram.csv")
+	parser:option("-s --size", "Packet size."):default(60):convert(tonumber)
 end
 
 function master(args)
 	local dev1 = device.config({port = args.dev1, rxQueues = 2, txQueues = 2})
 	local dev2 = device.config({port = args.dev2, rxQueues = 2, txQueues = 2})
 	device.waitForLinks()
-	dev1:getTxQueue(0):setRate(args.rate, PKT_SIZE)
-	dev2:getTxQueue(0):setRate(args.rate, PKT_SIZE)
-	mg.startTask("loadSlave", dev1:getTxQueue(0))
+	dev1:getTxQueue(0):setRate(args.rate, args.size)
+	dev2:getTxQueue(0):setRate(args.rate, args.size)
+	mg.startTask("loadSlave", dev1:getTxQueue(0), args.size)
 	if dev1 ~= dev2 then
-		mg.startTask("loadSlave", dev2:getTxQueue(0))
+		mg.startTask("loadSlave", dev2:getTxQueue(0), args.size)
 	end
 	stats.startStatsTask{dev1, dev2}
-	mg.startSharedTask("timerSlave", dev1:getTxQueue(1), dev2:getRxQueue(1), args.file)
+	mg.startSharedTask("timerSlave", dev1:getTxQueue(1), dev2:getRxQueue(1), args.file, args.size)
 	mg.waitForTasks()
 end
 
-function loadSlave(queue)
+function loadSlave(queue, size)
 	local mem = memory.createMemPool(function(buf)
 		buf:getEthernetPacket():fill{
 			ethSrc = nil, -- default ethernet source
@@ -52,14 +52,15 @@ function loadSlave(queue)
 	end)
 	local bufs = mem:bufArray()
 	while mg.running() do
-		bufs:alloc(PKT_SIZE)
+		bufs:alloc(size)
 		queue:send(bufs)
 	end
 end
 
-function timerSlave(txQueue, rxQueue, histfile)
+function timerSlave(txQueue, rxQueue, histfile, size)
 	local timestamper = ts:newTimestamper(txQueue, rxQueue)
 	local hist = hist:new()
+	log:info("Packet Size: %d", size)
 	mg.sleepMillis(1000) -- ensure that the load task is running
 	while mg.running() do
 		hist:update(timestamper:measureLatency(function(buf) buf:getEthernetPacket().eth.dst:setString(ETH_DST) end))
