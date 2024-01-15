@@ -111,7 +111,6 @@ function timerSlave(txQueue, rxQueue, size, flows, histfile)
 		log:warn("Packet size %d is smaller than minimum timestamp size 84. Timestamped packets will be larger than load packets.", size)
 		size = 84
 	end
-	log:info("Packet Size: %d", size)
 	local timestamper = ts:newUdpTimestamper(txQueue, rxQueue)
 	local hist = hist:new()
 	mg.sleepMillis(1000) -- ensure that the load task is running
