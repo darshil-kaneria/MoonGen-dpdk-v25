@@ -47,9 +47,9 @@ function master(args)
 	mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, args.flows, args.output_file)
 	arp.startArpTask{
 		-- run ARP on both ports
-		{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP },
+		{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP, mac = "12:13:14:15:16:17" },
 		-- we need an IP address to do ARP requests on this interface
-		{ rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP }
+		{ rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP, mac = "13:14:15:16:17:18" }
 	}
 	mg.waitForTasks()
 end
