@@ -43,14 +43,19 @@ function master(args)
 	if args.rate > 0 then
 		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000, args.size)
 	end
-	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, args.flows)
 	mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, args.flows, args.output_file)
-	arp.startArpTask{
-		-- run ARP on both ports
-		{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP, mac = "12:13:14:15:16:17" },
+	mg.sleepMillis(300)
+
+	-- run ARP on both ports
+	arpInterfaces = {{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP, mac = "12:13:14:15:16:17" }}
+	if rxDev ~= txDev then
 		-- we need an IP address to do ARP requests on this interface
-		{ rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP, mac = "13:14:15:16:17:18" }
-	}
+		table.insert(arpInterfaces, { rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP, mac = "14:15:16:17:18:19" })
+	end
+	arp.startArpTask(arpInterfaces)
+
+	mg.sleepMillis(300)
+	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, args.flows)
 	mg.waitForTasks()
 end
 
