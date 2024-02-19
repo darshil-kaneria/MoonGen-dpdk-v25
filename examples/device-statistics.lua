@@ -53,7 +53,7 @@ function master(args)
 	if args.rate > 0 then
 		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000)
 	end
-	rxDev:getTxQueue(0).dev:UdpGenericFilter(rxDev:getRxQueue(3))
+	rxDev:getTxQueue(0).dev:udpFilter({}, rxDev:getRxQueue(3))
 
 	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size)
 	mg.startTask("receiveSlave", rxDev:getRxQueue(3), args.size)
