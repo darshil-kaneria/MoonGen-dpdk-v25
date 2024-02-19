@@ -184,8 +184,6 @@ namespace moonsniff {
 	uint32_t TCPDUMP_MAGIC_NANO         = 0xA1B23C4D;
 	uint32_t TCPDUMP_MAGIC_NANO_SWAPPED = 0x4D3CB2A1;
 
-	bool useNanosecondTimestamps = true;
-
 	void pcap_log_pkts(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** rx_pkts, uint16_t nb_pkts, uint32_t runtime, const char* filename, uint32_t snap_len, bool embeddedTimestampInPacket) {
 		int fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
 		if (!fd) {
@@ -207,11 +205,7 @@ namespace moonsniff {
 		size_t offset = 0;
 		pcap_hdr_t hdr;
 		pcaprec_hdr_t rechdr;
-		if (useNanosecondTimestamps) {
-			hdr.magic_number = TCPDUMP_MAGIC_NANO;
-		} else {
-			hdr.magic_number = TCPDUMP_MAGIC;
-		}
+		hdr.magic_number = TCPDUMP_MAGIC_NANO;
 		hdr.version_major = 2;
 		hdr.version_minor = 4;
 		hdr.thiszone = 0;

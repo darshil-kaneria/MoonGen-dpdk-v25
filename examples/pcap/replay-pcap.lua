@@ -48,14 +48,14 @@ function replay(queue, file, loop, rateLimiter, multiplier, sleepTime)
 				end
 				for i = 1, n  do
 					local buf = bufs[i]
-					-- ts is in microseconds
+					-- ts is in nanoseconds
 					local ts = dpdkc.get_timestamp_dynfield(buf)
 					if prev > ts then
 						ts = prev
 					end
 					local delay = ts - prev
-					delay = tonumber(delay * 10^3) / multiplier -- nanoseconds
-					delay = delay / (8000 / linkSpeed) -- delay in bytes
+					delay = delay / multiplier
+					delay = delay * (1000000 * linkSpeed) / 8 -- delay in bytes
 					buf:setDelay(delay)
 					prev = ts
 				end
