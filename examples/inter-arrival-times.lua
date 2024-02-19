@@ -10,7 +10,7 @@ function master(rxPort, waitTime)
 	if not rxPort then
 		errorf("usage: rxPort [waitTime]")
 	end
-	rxDev = device.config{ port = rxPort, rxDescs = 4096, dropEnable = false }
+	rxDev = device.config{ port = rxPort, dropEnable = false }
 	rxDev:wait()
 	local queue = rxDev:getRxQueue(0)
 	queue:enableTimestampsAllPackets()
