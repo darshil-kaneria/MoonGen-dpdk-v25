@@ -30,6 +30,7 @@ function configure(parser)
 	parser:flag("-f --fast", "Set fast flag to reduce the amount of live processing for higher performance. Only has effect if live flag is also set")
 	parser:flag("-c --capture", "If set, all incoming packets are captured as a whole.")
 	parser:option("-s --snaplen", "Maximum capture length of recorded packets (default size 64 B)."):args(1):convert(tonumber):default(64)
+	parser:flag("-V --vlans", "Keep vlan tags."):default(false)
 	parser:flag("-d --debug", "Insted of reading real input, some fake input is generated and written to the output files.")
 	return parser:parse()
 end
@@ -39,8 +40,8 @@ function master(args)
 		-- used mainly to test functionality of io
 		iodebug(args)
 	else
-		args.dev[1] = device.config{port = args.dev[1], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false}
-		args.dev[2] = device.config{port = args.dev[2], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false}
+		args.dev[1] = device.config{port = args.dev[1], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
+		args.dev[2] = device.config{port = args.dev[2], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
 		device.waitForLinks()
 		local dev0tx = args.dev[1]:getTxQueue(0)
 		local dev0rx = args.dev[1]:getRxQueue(0)
