@@ -55,7 +55,7 @@ function replay(queue, file, loop, rateLimiter, multiplier, sleepTime)
 					end
 					local delay = ts - prev
 					delay = delay / multiplier
-					delay = delay * (1000000 * linkSpeed) / 8 -- delay in bytes
+					delay = delay * linkSpeed / (8*1000) -- delay in bytes
 					buf:setDelay(delay)
 					prev = ts
 				end
