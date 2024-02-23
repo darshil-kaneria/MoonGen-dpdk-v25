@@ -80,7 +80,7 @@ void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue
 			if (pkt) {
 				num_bad_pkts++;
 				// packet size: [MAC, CRC] to be consistent with HW counters
-				num_bad_bytes += pkt->pkt_len;
+				num_bad_bytes += pkt->pkt_len + packet_overhead - 20;
 				pkts[send_buf_idx++] = pkt;
 			}
 			if (send_buf_idx >= BUF_SIZE) {
