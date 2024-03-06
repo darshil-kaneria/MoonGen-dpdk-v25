@@ -24,10 +24,11 @@ include_directories(
 set(files
 	src/moongen-main.cpp
 	src/software-timestamping.c
-	src/crc-rate-limiter.c
 	src/software-rate-limiter.cpp
 	src/moonsniff.cpp
 	src/histogram.cpp
+	src/crc-ratecontrol.cpp
+	src/launch-timestamp.cpp
 )
 
 set(libraries

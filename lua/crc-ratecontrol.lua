@@ -1,3 +1,5 @@
+local mod = {}
+
 local device = require "device"
 local pkt    = require "packet"
 local memory = require "memory"
@@ -9,51 +11,73 @@ local txQueue = device.__txQueuePrototype
 local device = device.__devicePrototype
 local C = ffi.C
 
-ffi.cdef[[
-	void moongen_send_all_packets_with_delay_bad_crc(uint8_t port_id, uint16_t queue_id, struct rte_mbuf** load_pkts, uint16_t num_pkts, struct mempool* pool, uint32_t min_pkt_size, uint32_t packet_overhead);
+ffi.cdef [[
+	struct RateLimiterCRC { };
+
+	struct RateLimiterCRC* mg_ratelimiter_crc_create(struct mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD);
+	void mg_ratelimiter_crc_send_packets(struct RateLimiterCRC* delayer, struct rte_mbuf** load_pkts, uint16_t num_pkts);
+    uint64_t mg_ratelimiter_crc_send_timestamp_packet(struct RateLimiterCRC* delayer, uint16_t num_packets);
+    uint64_t mg_ratelimiter_crc_empty_delay(struct RateLimiterCRC* delayer, uint16_t num_packets);
 ]]
 
-local mempool
---- Send rate-controlled packets by filling gaps with invalid packets.
--- @param bufs
--- @param targetRate optional, hint to the driver which total rate you are trying to achieve.
---   increases precision at low non-cbr rates
--- @param n optional, number of packets to send (defaults to full bufs)
-function txQueue:sendWithDelay(bufs, targetRate, n)
-	-- check if CRC checksums can be disabled
+local C = ffi.C
+
+local rateLimiterCRC = {}
+mod.rateLimiterCRC = rateLimiterCRC
+rateLimiterCRC.__index = rateLimiterCRC
+
+function mod.new(queue, targetRate)
+    -- check if CRC checksums can be disabled
 	-- on e810 NICs packets with an incorrect Ethernet length field can be used
-	if not self.dev.crcPatch and not self.dev.e810 then
+	if not queue.dev.crcPatch and not queue.dev.e810 then
 		log:fatal("Driver does not support disabling the CRC flag. This feature requires a patched driver.")
 	end
 	targetRate = targetRate or 14.88
-	self.used = true
-	mempool = mempool or memory.createMemPool{
+	local mempool = memory.createMemPool{
 		func = function(buf)
 			-- this is tcp packet because the netfpga/OSNT system we use for testing this
 			-- cannot handle all-zero packets properly (filters get confused)
-			-- the actual contents of the packets don't matter since their CRC is invalid anways
+			-- the actual contents of the packets don't matter since their CRC is invalid anyways
 			local pkt = buf:getTcpPacket()
 			pkt:fill()
 
 			-- use packets with wrong ethenet length field on e810 NICs instead
-			if self.dev.e810 then
+			if queue.dev.e810 then
 				pkt.eth:setType(1)
 			end
 		end
 	}
-	n = n or bufs.size
-	local minPktSize = self.dev.minPacketSize or 64
-	local maxPktRate = self.dev.maxPacketRate or 14.88
-	local pktOverhead = self.dev.packetOverhead or 20
-	local lineRate = self.dev.lineRate or 10
+	local minPktSize = queue.dev.minPacketSize or 64
+	local maxPktRate = queue.dev.maxPacketRate or 14.88
+	local pktOverhead = queue.dev.packetOverhead or 20
+	local linkSpeed = queue.dev:getLinkStatus().speed
 	-- allow smaller packets at low rates
 	if targetRate < maxPktRate / 2 then
 		minPktSize = minPktSize + pktOverhead
 	else
-		minPktSize = math.floor(lineRate * 10^9 / 10^6 / 8 / maxPktRate)
+		minPktSize = math.floor(linkSpeed * 10^9 / 10^6 / 8 / maxPktRate)
 	end
-	C.moongen_send_all_packets_with_delay_bad_crc(self.id, self.qid, bufs.array, n, mempool, minPktSize, pktOverhead)
-	return bufs.size
+
+	local delayer = C.mg_ratelimiter_crc_create(mempool, queue.id, queue.qid, minPktSize, pktOverhead)
+	
+	return setmetatable({
+		delayer = delayer,
+		mempool = mempool,
+		minPktSize = minPktSize,
+		maxPktRate = maxPktRate,
+		pktOverhead = pktOverhead,
+		linkSpeed = linkSpeed
+	}, rateLimiterCRC)
+end
+
+function rateLimiterCRC:sendWithDelay(bufs, n)
+	local n = n or bufs.size
+    C.mg_ratelimiter_crc_send_packets(self.delayer, bufs.array, n)
+	return n
+end
+
+function rateLimiterCRC:__serialize()
+	return "require 'crc-ratecontrol'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('crc-ratecontrol').rateLimiterCRC"), true
 end
 
 --- Set the time to wait before the packet is sent for software rate-controlled send methods.
@@ -98,3 +122,4 @@ for driver, dev in pairs(require("drivers")) do
 	end
 end
 
+return mod
