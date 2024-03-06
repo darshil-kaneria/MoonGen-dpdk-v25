@@ -1,14 +1,15 @@
-local mg      = require "moongen"
-local memory  = require "memory"
-local device  = require "device"
-local ts      = require "timestamping"
-local stats   = require "stats"
-local hist    = require "histogram"
-local log     = require "log"
-local limiter = require "software-ratecontrol"
+local mg          = require "moongen"
+local memory      = require "memory"
+local device      = require "device"
+local ts          = require "timestamping"
+local stats       = require "stats"
+local hist        = require "histogram"
+local log         = require "log"
+local crc_ratecontrol = require "crc-ratecontrol"
+local limiter     = require "software-ratecontrol"
 
-local PKT_SIZE	= 60
-local ETH_DST	= "12:13:14:15:16:17"
+local PKT_SIZE	  = 60
+local ETH_DST	  = "12:13:14:15:16:17"
 
 function master(txPort, rate, rc, pattern, threads)
 	if not txPort or not rate or not rc then
@@ -67,14 +68,16 @@ function loadSlave(queue, txDev, rate, rc, pattern, rateLimiter, threadId, numTh
 		end
 	elseif rc == "moongen" then
 		-- larger batch size is useful when sending it through a rate limiter
+		local ratecontrol = crc_ratecontrol.new(queue, rate * numThreads)
 		local bufs = mem:bufArray(128)
+		local linkSpeed = txDev:getLinkStatus().speed
 		local dist = pattern == "poisson" and poissonDelay or function(x) return x end
 		while mg.running() do
 			bufs:alloc(PKT_SIZE)
 			for _, buf in ipairs(bufs) do
-				buf:setDelay(dist(10^10 / numThreads / 8 / (rate * 10^6) - PKT_SIZE - 24))
+				buf:setDelay(dist(linkSpeed * 10^6 / numThreads / 8 / (rate * 10^6) - PKT_SIZE - 24))
 			end
-			queue:sendWithDelay(bufs, rate * numThreads)
+			ratecontrol:sendWithDelay(bufs)
 		end
 	else
 		log:error("Unknown rate control method")

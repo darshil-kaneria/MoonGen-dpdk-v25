@@ -1,11 +1,12 @@
-local mg        = require "moongen"
-local memory    = require "memory"
-local ts        = require "timestamping"
-local device    = require "device"
-local stats     = require "stats"
-local timer     = require "timer"
-local histogram = require "histogram"
-local log       = require "log"
+local mg          = require "moongen"
+local memory      = require "memory"
+local ts          = require "timestamping"
+local device      = require "device"
+local stats       = require "stats"
+local timer       = require "timer"
+local histogram   = require "histogram"
+local log         = require "log"
+local crc_ratecontrol = require "crc-ratecontrol"
 
 local PKT_SIZE = 60
 
@@ -31,6 +32,7 @@ function loadSlave(dev, rxDev, queue, rate, size)
 			ethType = 0x1234
 		}
 	end)
+	local ratecontrol = crc_ratecontrol.new(queue)
 	local bufs = mem:bufArray()
 	local rxStats = stats:newDevRxCounter(rxDev, "plain")
 	local txStats = stats:newManualTxCounter(dev, "plain")
@@ -41,7 +43,7 @@ function loadSlave(dev, rxDev, queue, rate, size)
 			buf:setDelay(poissonDelay(10^10 / 8 / (rate * 10^6) - size - 24))
 			--buf:setRate(rate)
 		end
-		txStats:updateWithSize(queue:sendWithDelay(bufs), size)
+		txStats:updateWithSize(ratecontrol:sendWithDelay(bufs), size)
 		rxStats:update()
 		--txStats:update()
 	end
