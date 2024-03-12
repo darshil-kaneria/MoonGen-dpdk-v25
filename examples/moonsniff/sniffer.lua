@@ -40,36 +40,34 @@ function master(args)
 		-- used mainly to test functionality of io
 		iodebug(args)
 	else
-		args.dev[1] = device.config{port = args.dev[1], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
-		args.dev[2] = device.config{port = args.dev[2], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
+		local dev1 = device.config{port = args.dev[1], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
+		local dev2 = device.config{port = args.dev[2], txQueues = 1, rxQueues = 1, rxDescs = 4096, dropEnable = false, stripVlan = (not args.vlans)}
 		device.waitForLinks()
-		local dev0tx = args.dev[1]:getTxQueue(0)
-		local dev0rx = args.dev[1]:getRxQueue(0)
-		local dev1tx = args.dev[2]:getTxQueue(0)
-		local dev1rx = args.dev[2]:getRxQueue(0)
+		local dev0tx = dev1:getTxQueue(0)
+		local dev0rx = dev1:getRxQueue(0)
+		local dev1tx = dev2:getTxQueue(0)
+		local dev1rx = dev2:getRxQueue(0)
 
 		if args.live then
-			stats.startStatsTask{rxDevices = {args.dev[1], args.dev[2]}}
+			stats.startStatsTask{rxDevices = {dev1, dev2}}
 		else
 			-- if we are not live we want to print the stats to a seperate file so they are easily
 			-- available for post-processing
-			stats.startStatsTask{rxDevices = {args.dev[1], args.dev[2]}, file = args.output .. "-stats.csv", format = "csv"}
+			stats.startStatsTask{rxDevices = {dev1, dev2}, file = args.output .. "-stats.csv", format = "csv"}
 		end
-		args.dev[1]:enableRxTimestampsAllPackets(dev0rx)
-		args.dev[2]:enableRxTimestampsAllPackets(dev1rx)
+		dev1:enableRxTimestampsAllPackets(dev0rx)
+		dev2:enableRxTimestampsAllPackets(dev1rx)
 
 		local bar = barrier:new(2)
 
-		ts.syncClocks(args.dev[1], args.dev[2])
-		args.dev[1]:clearTimestamps()
-		args.dev[2]:clearTimestamps()
-
+		ts.syncClocks(dev1, dev2)
+		dev1:clearTimestamps()
+		dev2:clearTimestamps()
 
 		-- start the tasks to sample incoming packets
 		-- correct mesurement requires a packet to arrive at Pre before Post
-		local receiver0 = lm.startTask("timestamp", dev0rx, args.dev[2], bar, true, args)
-		local receiver1 = lm.startTask("timestamp", dev1rx, args.dev[1], bar, false, args)
-
+		local receiver0 = lm.startTask("timestamp", dev0rx, bar, true, args)
+		local receiver1 = lm.startTask("timestamp", dev1rx, bar, false, args)
 
 		receiver0:wait()
 		receiver1:wait()
@@ -81,7 +79,7 @@ function master(args)
 	end
 end
 
-function timestamp(queue, otherdev, bar, pre, args)
+function timestamp(queue, bar, pre, args)
 	local bufs = memory.bufArray()
 	local drainQueue = timer:new(0.5)
 	while lm.running and drainQueue:running() do
