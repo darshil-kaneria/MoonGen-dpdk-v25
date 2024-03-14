@@ -33,6 +33,8 @@ void DelayEmulator::send_batch(struct rte_mbuf** load_pkts, uint16_t num_pkts){
 }
 
 void DelayEmulator::transmit_loop(){
+	rte_delay_ms(500);
+
 	// warmup
 	for(int i = 0; i < 100; i++){
 		ratelimiter->empty_delay(64);
