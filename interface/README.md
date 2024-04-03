@@ -20,7 +20,7 @@ using `./moongen-simple help options`.
 - `sudo ./moongen-simple start qos-foreground:0:1 qos-background:0:1`
 - `sudo ./moongen-simple start udp-load:0:1:rate=1mp/s,mode=all,timestamp`
 - `sudo ./moongen-simple start "udp-load:0::rate=1000:udpDst=range(100,200)"`
-- `sudo ./moongen-simple start "load-latency:0,1:0,1:rate=1000:ip4Dst=ip'192.168.0.1'"`
+- `sudo ./moongen-simple start "udp-load:0,1:0,1:rate=1000:ip4Dst=ip'192.168.0.1'"`
 
 ## Commands
 

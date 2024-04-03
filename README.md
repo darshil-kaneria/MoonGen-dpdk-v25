@@ -107,7 +107,7 @@ The example [l3-load-latency.lua](https://github.com/emmericp/MoonGen/blob/maste
 ## Simple CLI
 The simplest way to get started is using the [simple command line interface](https://github.com/emmericp/MoonGen/blob/master/interface/README.md). For example:
 
-    sudo ./moongen-simple start load-latency:0:1:rate=10Mp/s,time=3m
+    sudo ./moongen-simple start load-latency:0:1:rate=10Mp/s,timeLimit=3m
     
 This sends packets with a rate of 10 million packets per second for 3 minutes from port 0 to port 1 and outputs the latency at the end of the run. Available DPDK ports are printed on startup.
 

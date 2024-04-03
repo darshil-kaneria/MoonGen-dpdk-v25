@@ -16,8 +16,8 @@ function option.parse(_, pattern, error)
 	local t = type(pattern)
 
 	if t == "string" then
-		return error:assert(_patternset[pattern], "Invalid value %q. Can be one of %s.",
-		  pattern, table.concat(_patternlist, ", ")) or "cbr"
+		error:assert(_patternset[pattern], "Invalid value %q. Can be one of %s.", pattern, table.concat(_patternlist, ", "))
+		return pattern
 	elseif t ~= "nil" then
 		error("Invalid argument. String expected, got %s.", t)
 	end
