@@ -17,6 +17,11 @@ function option.parse(self, bool, error)
 		return false
 	end
 
+	if bool and not error:assert(#self:property("tx") == 1,
+		"Cannot timestamp flows with more than one transmission device.") then
+		return false
+	end
+
 	return bool
 end
 
