@@ -63,6 +63,10 @@ local function loadThread(flow, sendQueue)
 				flow:updateBuf(buf)
 				counter:countPacket(buf)
 			end
+		else
+			for _, buf in ipairs(bufs) do
+				counter:countPacket(buf)
+			end
 		end
 
 		if data then
