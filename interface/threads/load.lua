@@ -64,9 +64,7 @@ local function loadThread(flow, sendQueue)
 				counter:countPacket(buf)
 			end
 		else
-			for _, buf in ipairs(bufs) do
-				counter:countPacket(buf)
-			end
+			counter:countPackets(bufs[1], bufs.size)
 		end
 
 		if data then
