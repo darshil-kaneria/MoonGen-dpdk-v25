@@ -33,6 +33,10 @@ function thread.prepare(flows, devices)
 			local ft = flow.packet.fillTbl
 
 			for _,dev in ipairs(flow:property "tx") do
+				if not devices[dev].arp_mac then
+					assert((type(ft.ethSrc) == "number"), "A static source MAC address for the first flow has to specified when using ARP!")
+					devices[dev].arp_mac = devices[dev].arp_mac or ft.ethSrc
+				end
 				addIp(dev, ft.ip4Src or ft.ip6Src)
 			end
 
@@ -62,7 +66,8 @@ function thread.start(devices)
 		table.insert(queues, {
 			rxQueue = devices:rxQueue(dev),
 			txQueue = devices:txQueue(dev),
-			ips = ipList
+			ips = ipList,
+			mac = devices[dev].arp_mac
 		})
 	end
 

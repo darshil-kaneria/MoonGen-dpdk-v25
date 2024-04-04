@@ -25,10 +25,9 @@ function thread.start(devices)
 		-- setup rate limit
 		if flow:option "rate" then
 			if flow:option "ratePattern" == "cbr" then
-				local rc = dpdkc.rte_eth_set_queue_rate_limit(txQueue.id, txQueue.qid, flow:option "rate")
-				if rc ~= 0 then -- fallback to software ratelimiting
-					txQueue = limiter:new(txQueue, "cbr", flow:getDelay())
-				end
+				txQueue:setRate(flow:option "rate")
+			elseif flow.results.ratePattern == "software_cbr" then
+				txQueue = limiter:new(txQueue, "cbr", flow:getDelay())
 			elseif flow.results.ratePattern == "poisson" then
 				txQueue = limiter:new(txQueue, "poisson", flow:getDelay())
 			end

@@ -1,4 +1,4 @@
-local _patternlist, _patternset = { "cbr", "poisson" }, {}
+local _patternlist, _patternset = { "cbr", "software_cbr", "poisson" }, {}
 -- TODO pattern = custom (closure and buf:setDelay)
 -- TODO flagOption to enable crc ratecontrol
 for _,v in ipairs(_patternlist) do
@@ -9,7 +9,7 @@ local option = {}
 
 option.description = "Control how bytes are distributed over time, when a ratelimit is set."
 option.usage = {
-	{ "(cbr|poisson)", "Poisson will create bursts of packets instead of a constant bitrate. (default = cbr)" }
+	{ "(cbr|software_cbr|poisson)", "Poisson will create bursts of packets instead of a constant bitrate. (default = cbr)" }
 }
 
 function option.parse(_, pattern, error)
