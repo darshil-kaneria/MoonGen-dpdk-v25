@@ -95,7 +95,7 @@ function compare( sRate , rRate )
 	if ( eRate > rRate ) then
 		log:warn( "Measured receive rate: " .. rRate .. " MBit/s | Missing: " .. sRate - rRate .. " MBit/s")
 	else
-		log:info( "Measured receive rate: " .. math.floor( sRate ) .. " MBit/s")
+		log:info( "Measured receive rate: " .. math.floor( rRate ) .. " MBit/s")
 	end
 
 	-- Return result

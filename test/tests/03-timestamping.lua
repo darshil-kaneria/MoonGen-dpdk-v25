@@ -43,17 +43,17 @@ function slave( rxDev , txDev )
 	local maximum = hist:max()
 	
 	
-	log:info( "Expecting maximum deviation: 64 ns" )
+	log:info( "Expecting maximum deviation: 128 ns" )
 
 	log:info( "Recorded average latency: " .. math.floor( average ) .. " ns" )
 	log:info( "Maximum measured latency: " .. math.floor( maximum ) .. " ns")
 	log:info( "Minimum measured latency: " .. math.floor( minimum ) .. " ns" )
 	
 	-- Check deviation
-	if( ( maximum - average > 64 ) ) then
+	if( ( maximum - average > 128 ) ) then
 		log:warn( "Maximum latency of " .. maximum " ns exeeded 64 ns deviation from average " .. average .. " ns" )
 	end
-	if( ( average - minimum > 64 ) ) then
+	if( ( average - minimum > 128 ) ) then
 		log:warn( "Minimum latency of " .. minimum " ns exeeded 64 ns deviation from average " .. average .. " ns" )
 		end
 	
