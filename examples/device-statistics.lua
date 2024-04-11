@@ -15,6 +15,7 @@ local stats  = require "stats"
 local timer  = require "timer"
 local arp    = require "proto.arp"
 local log    = require "log"
+local eth    = require "proto.ethernet"
 
 local ffi = require "ffi"
 
@@ -45,23 +46,23 @@ function configure(parser)
 end
 
 function master(args)
-	txDev = device.config{port = args.txDev, rxQueues = 4, txQueues = 4}
-	rxDev = device.config{port = args.rxDev, rxQueues = 4, txQueues = 4}
+	local txDev = device.config{port = args.txDev, rxQueues = 4, txQueues = 4}
+	local rxDev = device.config{port = args.rxDev, rxQueues = 4, txQueues = 4}
 	device.waitForLinks()
 	-- max 1kpps timestamping traffic timestamping
 	-- rate will be somewhat off for high-latency links at low rates
 	if args.rate > 0 then
 		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000)
 	end
-	rxDev:getTxQueue(0).dev:udpFilter({}, rxDev:getRxQueue(3))
+	rxDev:l2Filter(eth.TYPE_IP, 3)
 
 	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size)
 	mg.startTask("receiveSlave", rxDev:getRxQueue(3), args.size)
 	arp.startArpTask{
 		-- run ARP on both ports
-		{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP },
+		{ rxQueue = rxDev:getRxQueue(2), txQueue = rxDev:getTxQueue(2), ips = RX_IP , mac = "12:13:14:15:16:17" },
 		-- we need an IP address to do ARP requests on this interface
-		{ rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP }
+		{ rxQueue = txDev:getRxQueue(2), txQueue = txDev:getTxQueue(2), ips = ARP_IP, mac = "14:15:16:17:18:19" }
 	}
 	mg.waitForTasks()
 end
