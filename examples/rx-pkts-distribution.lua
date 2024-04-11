@@ -1,4 +1,4 @@
-local mg			= require "dpdk"
+local mg			= require "moongen"
 local memory		= require "memory"
 local device		= require "device"
 local stats			= require "stats"
@@ -7,27 +7,27 @@ local log			= require "log"
 local timer			= require "timer"
 
 
-function master(rxPort, saveInterval)
-	if not rxPort then
-		return log:info("usage: rxPort [saveInterval]")
-	end
-	-- TODO: RSS?
-	local saveInterval = saveInterval or 60
-	local rxDev = device.config{ port = rxPort, dropEnable = false }
+function configure(parser)
+	parser:argument("rxDev", "Device to receive from."):convert(tonumber)
+	parser:option("-i --saveInterval", "Interval to create histogram files."):default(60):convert(tonumber)
+end
+
+function master(args)
+	local rxDev = device.config{port = args.rxDev, dropEnable = false}
 	device.waitForLinks()
-	mg.launchLua("counterSlave", rxDev:getRxQueue(0), saveInterval)
-	mg.waitForSlaves()
+	mg.startTask("counterSlave", rxDev:getRxQueue(0), args)
+	mg.waitForTasks()
 end
 
 
-function counterSlave(queue, saveInterval)
-	local bufs = memory.bufArray()
-	local ctrs = {}
+function counterSlave(queue, args)
 	local rxCtr = stats:newDevRxCounter(queue.dev)
 	-- to track if we lose packets on the NIC
 	local pktCtr = stats:newPktRxCounter("Packets counted", "plain")
 	local hist = histogram:create()
-	local timer = timer:new(saveInterval)
+	local timer = timer:new(args.saveInterval)
+
+	local bufs = memory.bufArray()
 	while mg.running() do
 		local rx = queue:tryRecv(bufs, 100)
 		for i = 1, rx do
@@ -49,6 +49,8 @@ function counterSlave(queue, saveInterval)
 	end
 	rxCtr:finalize()
 	pktCtr:finalize()
+	hist:print()
+	hist:save("hist" .. time() .. ".csv")
 	-- TODO: check the queue's overflow counter to detect lost packets
 end
 
