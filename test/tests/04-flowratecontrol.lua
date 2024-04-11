@@ -1,16 +1,16 @@
 -- Function to test: Flow rate control
 -- Test against: Network card support.
 
-local dpdk	= require "dpdk"
+local mg		= require "moongen"
 local memory	= require "memory"
-local ts	= require "timestamping"
+local ts		= require "timestamping"
 local device	= require "device"
 local filter	= require "filter"
-local timer	= require "timer"
-local stats	= require "stats"
+local timer		= require "timer"
+local stats		= require "stats"
 
-local log	= require "testlog"
-local tconfig	= require "tconfig"
+local log		= require "testlog"
+local tconfig	= require "config.tconfig"
 local testlib	= require "testlib"
 
 local FLOWS = 4
@@ -31,7 +31,7 @@ function slave( rxDev , txDev , rxInfo , txInfo )
 		buf:getEthernetPacket():fill{
 			pktLength = PKT_SIZE,
 			ethSrc = txQueue,
-			ethDst = "FF:FF:FF:FF:FF:FF:FF:FF"
+			ethDst = "FF:FF:FF:FF:FF:FF"
 		}
 	end)
 	local bufs = mempool:bufArray()
@@ -49,7 +49,7 @@ function slave( rxDev , txDev , rxInfo , txInfo )
 		log:info( "Expected rate: " .. math.floor( rate )  .. " MBit/s" )
 	
 		-- Do flow rate control
-		while dpdk.running() and runtime:running() do
+		while mg.running() and runtime:running() do
 			bufs:alloc( PKT_SIZE )
 			queue:send( bufs )
 			txCtr:update()

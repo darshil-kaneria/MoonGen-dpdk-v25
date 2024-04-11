@@ -2,14 +2,14 @@
 -- Test against: Network card speed.
 
 local luaunit	= require "luaunit"
-local dpdk	= require "dpdk"
+local mg		= require "moongen"
 local memory	= require "memory"
 local device	= require "device"
-local timer	= require "timer"
+local timer		= require "timer"
 
-local log	= require "testlog"
+local log		= require "testlog"
 local testlib	= require "testlib"
-local tconfig	= require "tconfig"
+local tconfig	= require "config.tconfig"
 
 local PKT_SIZE  = 124
 
@@ -44,7 +44,7 @@ function slave( dev , card )
 	local runtime = timer:new( testlib.getRuntime() )
 
 	-- Send packets
-	while dpdk.running() and runtime:running() do
+	while mg.running() and runtime:running() do
 		bufs:alloc( PKT_SIZE )
 		queue:send( bufs )
 		i = i + 64

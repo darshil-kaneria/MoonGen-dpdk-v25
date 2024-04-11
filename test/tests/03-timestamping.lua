@@ -2,17 +2,17 @@
 -- Test against: Network card support.
 
 local luaunit 	= require "luaunit"
-local dpdk	= require "dpdk"
-local ts	= require "timestamping"
-local hist	= require "histogram"
+local mg		= require "moongen"
+local ts		= require "timestamping"
+local hist		= require "histogram"
 local device	= require "device"
-local timer	= require "timer"
+local timer		= require "timer"
 
-local log	= require "testlog"
+local log		= require "testlog"
 local testlib	= require "testlib"
-local tconfig	= require "tconfig"
+local tconfig	= require "config.tconfig"
 
-local PKT_SIZE = 124
+local PKT_SIZE 	= 124
 
 function master()
 	log:info( "Function to test: Timestamping" )
@@ -33,7 +33,7 @@ function slave( rxDev , txDev )
 	local runtime = timer:new( testlib.getRuntime() )
 	
 	-- Do timestamping
-	while runtime:running() and dpdk.running()  do
+	while runtime:running() and mg.running()  do
 		hist:update( timestamper:measureLatency() )
 	end
 	

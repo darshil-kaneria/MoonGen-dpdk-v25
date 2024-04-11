@@ -21,12 +21,12 @@
 
 local testlib = {}
 
-local dpdk	= require "dpdk"
-local tconfig	= require "tconfig"
-local timer	= require "timer"
+local mg		= require "moongen"
+local tconfig	= require "config.tconfig"
+local timer		= require "timer"
 local device	= require "device"
 local luaunit	= require "luaunit"
-local log	= require "testlog"
+local log		= require "testlog"
 
 -- Init runtime
 testlib.wait = 10
@@ -61,7 +61,7 @@ function testlib:masterSingle()
 		Tests[ "Tested device: " .. cards[ i ][ 1 ] ] = function()
 			log:info( "Testing device: " .. cards[ i ][ 1 ] )
 			local result = slave( devs[ i ] , cards[ i ] )
-			dpdk.waitForSlaves()
+			mg.waitForTasks()
 			luaunit.assertTrue( result )
 		end
 	end
@@ -132,8 +132,8 @@ function testlib:masterPairMulti()
 		local dev2 = pairs[ i ][ 2 ]
 		Tests[ "Tested device: " .. i ] = function()
 			log:info( "Testing device: " .. pairs[ i ][ 1 ] .. " (" .. pairs[ i ][ 2 ] .. ")")
-			local slave1 = dpdk.launchLua( "slave1" , devs[ dev1 ] , devs[ dev2 ] )
-			local slave2 = dpdk.launchLua( "slave2" , devs[ dev1 ] , devs[ dev2 ] , result1 )
+			local slave1 = mg.startTask( "slave1" , devs[ dev1 ] , devs[ dev2 ] )
+			local slave2 = mg.startTask( "slave2" , devs[ dev1 ] , devs[ dev2 ] , result1 )
 			local return1 = slave1:wait()
 			local return2 = slave2:wait()
 			local returnC = compare( return1 , return2 )
@@ -142,8 +142,8 @@ function testlib:masterPairMulti()
 		-- Mirror input devices
 		Tests[ "Tested device: " .. i .. "(2)" ] = function ()
 			log:info( "Testing device: " .. pairs[ i ][ 2 ].. " (" .. pairs[ i ][ 1 ] .. ")" )
-			local slave1 = dpdk.launchLua( "slave1" , devs[ dev2 ] , devs[ dev1 ] )
-			local slave2 = dpdk.launchLua( "slave2" , devs[ dev2 ] , devs[ dev1 ] )
+			local slave1 = mg.startTask( "slave1" , devs[ dev2 ] , devs[ dev1 ] )
+			local slave2 = mg.startTask( "slave2" , devs[ dev2 ] , devs[ dev1 ] )
 			local return1 = slave1:wait()
 			local return2 = slave2:wait()
 			local returnC = compare( return1 , return2 )

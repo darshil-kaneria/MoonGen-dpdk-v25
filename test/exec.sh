@@ -113,7 +113,7 @@ do
 done
 
 # Print summary
-printf "---------------\n" | tee $logfile
+printf -- "---------------\n" | tee $logfile
 printf "${WHI}[INFO] Ran a total of $tests assertions in $utest unit test cases.\n" | tee $logfile
 if [ "$fails" -gt 0 ]
 then
