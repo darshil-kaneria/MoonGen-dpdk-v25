@@ -5,13 +5,14 @@ local ts		= require "timestamping"
 local hist		= require "histogram"
 local log		= require "log"
 local timer		= require "timer"
+local stats     = require "stats"
 
 function configure(parser)
 	parser:argument("rxDev", "The device to receive from"):convert(tonumber)
 end
 
 function master(args)
-	local rxDev = device.config{port = args.rxDev, dropEnable = false}
+	local rxDev = device.config{port = args.rxDev, rxQueues = 1, txQueues = 1}
 	device.waitForLinks()
 	mg.startTask("rxThread", rxDev:getRxQueue(0), rxDev)
 	mg.waitForTasks()
@@ -22,6 +23,7 @@ function rxThread(queue, rxDev)
 
 	local total = 0
 	local times = {}
+	rxDev:getRxStats()
 	
 	local bufs = memory.createBufArray()
 	while mg.running() do
@@ -32,6 +34,7 @@ function rxThread(queue, rxDev)
 		end
 		total = total + n
 		bufs:free(n)
+		rxDev:getRxStats()
 	end
 
 	local pkts = rxDev:getRxStats()
@@ -49,8 +52,7 @@ function rxThread(queue, rxDev)
 
 	h:print()
 	h:save("histogram.csv")
-	print(pkts, total)
 	if pkts > total then
-		log.warn("Lost packets: " .. pkts - total .. " (this can happen if the NIC still receives data after this script stops the receive loop)")
+		log:warn("Lost packets: " .. pkts - total .. " (this can happen if the NIC still receives data after this script stops the receive loop)")
 	end
 end
