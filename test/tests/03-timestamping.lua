@@ -38,14 +38,14 @@ function slave( rxDev , txDev )
 	end
 	
 	-- Get average, minimum & maximum latency
-	local average = hist:avg()
+	local average = hist:average()
 	local minimum = hist:min()
 	local maximum = hist:max()
 	
 	
 	log:info( "Expecting maximum deviation: 64 ns" )
-	log:info( "Recorded average deviation: " .. math.floor( average ) .. " ns" )
-	
+
+	log:info( "Recorded average latency: " .. math.floor( average ) .. " ns" )
 	log:info( "Maximum measured latency: " .. math.floor( maximum ) .. " ns")
 	log:info( "Minimum measured latency: " .. math.floor( minimum ) .. " ns" )
 	

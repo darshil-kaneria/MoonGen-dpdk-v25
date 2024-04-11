@@ -53,6 +53,9 @@ function slave( dev , card )
 	-- Calculate measured rate | mrate equals packets * packet size / runtime
 	local mRate = math.floor( ( i * ( PKT_SIZE + 24 ) * 8 ) / ( 1000 * 1000 ) ) * 1 / testlib.getRuntime()
 
+	-- allow for up to 2% of deviation
+	eRate = eRate * 0.98 
+
 	-- Check against erate
 	if( eRate >= mRate ) then
 		log:warn( "Measured rate: " .. mRate .. " MBit/s | Missing: " .. eRate - mRate .. " MBit/s" )

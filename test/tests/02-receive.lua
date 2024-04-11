@@ -82,19 +82,22 @@ end
 -- Compare measured rates
 function compare( sRate , rRate )	
 	-- Round receive rate down
-	return2 = math.floor( rRate )
+	local return2 = math.floor( rRate )
 	
 	-- Round max rate down | substract 10 MBit/s (max. 1% of rate).
-	srate = math.floor( math.min( sRate - 10 , sRate * 99 / 100 ) )
+	local srate = math.floor( math.min( sRate - 10 , sRate * 99 / 100 ) )
+
+	-- allow for up to 2% of deviation
+	local eRate = sRate * 0.98 
 	
 	-- Compare rates
 	log:info( "Expected receive rate: " .. math.floor( sRate ) .. " MBit/s" )
-	if ( sRate > rRate ) then
+	if ( eRate > rRate ) then
 		log:warn( "Measured receive rate: " .. rRate .. " MBit/s | Missing: " .. sRate - rRate .. " MBit/s")
 	else
 		log:info( "Measured receive rate: " .. math.floor( sRate ) .. " MBit/s")
 	end
 
 	-- Return result
-	return sRate <= rRate
+	return eRate <= rRate
 end
