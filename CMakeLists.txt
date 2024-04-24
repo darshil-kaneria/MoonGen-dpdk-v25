@@ -29,6 +29,8 @@ set(files
 	src/histogram.cpp
 	src/crc-ratecontrol.cpp
 	src/launch-timestamp.cpp
+	src/moonem.c
+	src/loss-models.c
 )
 
 set(libraries
