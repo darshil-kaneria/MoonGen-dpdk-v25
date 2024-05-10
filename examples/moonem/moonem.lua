@@ -16,6 +16,9 @@ _ENV = nil
 function configure (parser)
 	parser:option("-d --devs", "Devices to use: <RX-dev> <TX-dev>"):
 		args(2):convert(tonumber)
+	parser:option("-m --model", "Packet loss model. " ..
+		      "Valid choices: ge|netem"):
+		args(1):default("ge")
 	parser:option("-l --loss", "Loss probabilities [0.0,1.0]. " ..
 		      "Gilbert-Elliot: p [r [1-h [1-k]]]"):
 		args("+"):convert(tonumber):default({0})
@@ -36,7 +39,8 @@ local entries = {}
 function master (args)
 	if args.devs then
 		-- Add config-entry for CLI config
-		Entry{ RXdev=args.devs[1], TXdev=args.devs[2], loss=args.loss,
+		Entry{ RXdev=args.devs[1], TXdev=args.devs[2],
+		       model=args.model, loss=args.loss,
 		       RXnumBufs=args.numBufs}
 	end
 	if args.config then
@@ -120,24 +124,24 @@ end
 function startTasks (entries, deviceConfigs)
 	for _, entry in ipairs(entries) do
 		log:info("Forward: dev %d -> dev %d", entry.RXdev, entry.TXdev)
-		lm.startTask(entry.loss and "forward_ge" or "forward",
+		lm.startTask(entry.loss and "forward_loss" or "forward",
 			     deviceConfigs[entry.RXdev]:getRxQueue(0),
 			     deviceConfigs[entry.TXdev]:getTxQueue(0),
-			     entry.loss)
+			     entry.model, entry.loss)
 	end
 	lm.waitForTasks()
 end
 
 ffi.cdef [[
-void fwd(struct moonem_dev const* rx_dev,
-         struct moonem_dev const* tx_dev);
+void fwd(struct moonem_dev const* rx,
+         struct moonem_dev const* tx);
 ]]
 function forward (rxQueue, txQueue)
-	local rx_dev = ffi.new("struct moonem_dev",
-			       { port_id = rxQueue.id, queue_id = rxQueue.qid })
-	local tx_dev = ffi.new("struct moonem_dev",
-			       { port_id = txQueue.id, queue_id = txQueue.qid })
-	C.fwd(rx_dev, tx_dev)
+	local rx = ffi.new("struct moonem_dev",
+			   { port_id = rxQueue.id, queue_id = rxQueue.qid })
+	local tx = ffi.new("struct moonem_dev",
+			   { port_id = txQueue.id, queue_id = txQueue.qid })
+	C.fwd(rx, tx)
 end
 
 ffi.cdef [[
@@ -145,47 +149,20 @@ struct moonem_dev {
      uint8_t port_id;
      uint16_t queue_id;
 };
-void fwd_ge(struct moonem_dev const* rx_dev,
-            struct moonem_dev const* tx_dev,
-	    struct ge_model* model);
+enum loss_model { ge, netem };
+void fwd_loss(struct moonem_dev const* rx,
+              struct moonem_dev const* tx,
+              enum loss_model model_type,
+	      size_t const len,
+              double const* prob);
 ]]
-local createGE
-function forward_ge (rxQueue, txQueue, loss)
-	local rx_dev = ffi.new("struct moonem_dev",
-			       { port_id = rxQueue.id, queue_id = rxQueue.qid })
-	local tx_dev = ffi.new("struct moonem_dev",
-			       { port_id = txQueue.id, queue_id = txQueue.qid })
-	local ge_model = createGE(loss)
-	C.fwd_ge(rx_dev, tx_dev, ge_model)
-end
-
-ffi.cdef [[
-struct ge_model {
-     bool good;
-     int p;
-     int r;
-     int h_;
-     int k_;
-};
-int get_rand_max();
-]]
-function createGE (loss)
-	local p  = loss[1] or 0
-	local r  = loss[2] or 1 - p
-	local h_ = loss[3] or 1
-	local k_ = loss[4] or 0
-	-- are the supplied probabilities valid?
-	assert(p  >= 0.0 and p  <= 1.0, "Error: p ∉ [0,1]")
-	assert(r  >= 0.0 and r  <= 1.0, "Error: r ∉ [0,1]")
-	assert(h_ >= 0.0 and h_ <= 1.0, "Error: 1-h ∉ [0,1]")
-	assert(k_ >= 0.0 and k_ <= 1.0, "Error: 1-k ∉ [0,1]")
-	-- create the GE-model
-	local model = ffi.new("struct ge_model")
-	model.good = true
-	local RAND_MAX = C.get_rand_max()
-	model.p  = p  * RAND_MAX
-	model.r  = r  * RAND_MAX
-	model.h_ = h_ * RAND_MAX
-	model.k_ = k_ * RAND_MAX
-	return model
+function forward_loss (rxQueue, txQueue, model, loss)
+	local rx = ffi.new("struct moonem_dev",
+			   { port_id = rxQueue.id, queue_id = rxQueue.qid })
+	local tx = ffi.new("struct moonem_dev",
+			   { port_id = txQueue.id, queue_id = txQueue.qid })
+	local prob = ffi.new("double const[?]", #loss, loss)
+	C.fwd_loss(rx, tx,
+		   model or "ge",
+		   #loss, prob)
 end
