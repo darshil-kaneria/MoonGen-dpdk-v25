@@ -8,7 +8,7 @@ Entry{
 Entry{
 	RXdev = 1,
 	TXdev = 0,
-	loss = {0.5, 1, 1, 0},
+	loss = {0, 0, 0, 0.5},
 	RXnumBufs = 2047,
 	TXnumBufs = 2047
 }
