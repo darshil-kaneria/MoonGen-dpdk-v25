@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <assert.h>
-#include <stdlib.h>             /* for RAND_MAX */
+#include <stdlib.h>             // for RAND_MAX
 
 #include <rte_ethdev.h>		// for rte_eth_rx_burst
 #include "lifecycle.h"		// for is_running
@@ -10,49 +10,85 @@
 
 #define BATCH_SIZE 64
 
-/* only for moonem.lua */
-int get_rand_max() {
-     return RAND_MAX;
+/**
+ * @brief Forward traffic with loss model M from RX to TX.
+ **/
+#define FWD_LOSS(M, RX, TX)                                               \
+struct rte_mbuf* rx_bufs[BATCH_SIZE];                                     \
+struct rte_mbuf* tx_bufs[BATCH_SIZE];                                     \
+uint16_t n = 0;                                                           \
+while (is_running(0)) {                                                   \
+     if ((n = rte_eth_rx_burst((RX)->port_id, (RX)->queue_id,             \
+                               rx_bufs, BATCH_SIZE))) {                   \
+          uint16_t k = 0;                                                 \
+          for (uint16_t i = 0; i < n; ++i) {                              \
+               if ((M)->drop(M))                                          \
+                    rte_pktmbuf_free(rx_bufs[i]);                         \
+               else                                                       \
+                    tx_bufs[k++] = rx_bufs[i];                            \
+          }                                                               \
+          dpdk_send_all_packets((TX)->port_id, (TX)->queue_id,            \
+                                tx_bufs, k);                              \
+     }                                                                    \
 }
 
-/* To conveniently pass dev_info from Lua to C */
+/**
+ * @brief Helper struct to conveniently pass device info from Lua to C
+ **/
 struct moonem_dev {
-     uint8_t port_id;
-     uint16_t queue_id;
+     uint8_t const port_id;
+     uint16_t const queue_id;
 };
 
-void fwd(struct moonem_dev const rx_dev[static 1],
-	 struct moonem_dev const tx_dev[static 1]) {
+/**
+ * @brief Forward traffic from RX to TX.
+ **/
+void fwd(struct moonem_dev const rx[static 1],
+	 struct moonem_dev const tx[static 1]) {
      struct rte_mbuf* bufs[BATCH_SIZE];
      uint16_t n = 0;
-  
+
      while (is_running(0)) {
-          if ((n = rte_eth_rx_burst(rx_dev->port_id, rx_dev->queue_id,
-				    bufs, BATCH_SIZE)))
-               dpdk_send_all_packets(tx_dev->port_id, tx_dev->queue_id,
-				     bufs, n);
+          if ((n = rte_eth_rx_burst(rx->port_id, rx->queue_id, bufs, BATCH_SIZE)))
+               dpdk_send_all_packets(tx->port_id, tx->queue_id, bufs, n);
      }
 }
 
-void fwd_ge(struct moonem_dev const rx_dev[static 1],
-            struct moonem_dev const tx_dev[static 1],
-	    struct ge_model model[static 1]) {
-     struct rte_mbuf* rx_bufs[BATCH_SIZE];
-     struct rte_mbuf* tx_bufs[BATCH_SIZE];
-     uint16_t n = 0;
+static void fwd_loss_ge(struct ge_model m[static 1],
+			struct moonem_dev const rx[static 1],
+			struct moonem_dev const tx[static 1]) {
+     FWD_LOSS(m, rx, tx);
+}
 
-     while (is_running(0)) {
-          if ((n = rte_eth_rx_burst(rx_dev->port_id, rx_dev->queue_id,
-				    rx_bufs, BATCH_SIZE))) {
-               uint16_t k = 0;
-               for (uint16_t i = 0; i < n; ++i) {
-                    if (ge_drop(model))
-                         rte_pktmbuf_free(rx_bufs[i]);
-                    else
-                         tx_bufs[k++] = rx_bufs[i];
-               }
-               dpdk_send_all_packets(tx_dev->port_id, tx_dev->queue_id,
-				     tx_bufs, k);
-          }
+static void fwd_loss_netem(struct netem_model m[static 1],
+			   struct moonem_dev const rx[static 1],
+			   struct moonem_dev const tx[static 1]) {
+     FWD_LOSS(m, rx, tx);
+}
+
+/**
+ * @brief Forward traffic from RX to TX with packet loss.
+ **/
+void fwd_loss(struct moonem_dev const rx[static 1],
+	      struct moonem_dev const tx[static 1],
+	      enum loss_model model_type,
+	      size_t const len,
+	      double const prob[static len]) {
+     switch (model_type) {
+     case ge: {
+	  struct ge_model* m = ge_init(malloc(sizeof(struct ge_model)), len, prob);
+	  assert(m);
+	  fwd_loss_ge(m, rx, tx);
+	  free(m);
+	  break;
+     }
+     case netem: {
+	  struct netem_model* m = netem_init(malloc(sizeof(struct netem_model)), len, prob);
+	  assert(m);
+	  fwd_loss_netem(m, rx, tx);
+	  free(m);
+	  break;
+     }
+     default: perror("Unkown model type."); exit(1);
      }
 }
