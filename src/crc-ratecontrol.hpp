@@ -16,6 +16,7 @@ private:
     uint8_t port_id;
     uint16_t queue_id;
     uint64_t previous_missing_delay;
+    uint64_t invalid_packet_size;
     
     const int TRANSMIT_BUFFER_SIZE = 64;
     const uint64_t MIN_PACKET_SIZE;
@@ -23,8 +24,9 @@ private:
 
     struct rte_mbuf* get_delay_packet(uint64_t delay);
 public:
-    RateLimiterCRC(struct rte_mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD);
+    RateLimiterCRC(struct rte_mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD, uint64_t invalid_packet_size);
     void send_packets(struct rte_mbuf** load_pkts, uint16_t num_packets);
     uint64_t send_timestamp_packet(uint16_t num_packets);
     uint64_t empty_delay(uint16_t num_packets);
+    void set_invalid_packet_size(uint64_t invalid_packet_size);
 };

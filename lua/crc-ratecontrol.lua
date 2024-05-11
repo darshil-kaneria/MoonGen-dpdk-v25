@@ -14,10 +14,11 @@ local C = ffi.C
 ffi.cdef [[
 	struct RateLimiterCRC { };
 
-	struct RateLimiterCRC* mg_ratelimiter_crc_create(struct mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD);
+	struct RateLimiterCRC* mg_ratelimiter_crc_create(struct mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD, uint64_t invalid_packet_size);
 	void mg_ratelimiter_crc_send_packets(struct RateLimiterCRC* delayer, struct rte_mbuf** load_pkts, uint16_t num_pkts);
     uint64_t mg_ratelimiter_crc_send_timestamp_packet(struct RateLimiterCRC* delayer, uint16_t num_packets);
     uint64_t mg_ratelimiter_crc_empty_delay(struct RateLimiterCRC* delayer, uint16_t num_packets);
+	void mg_ratelimiter_crc_set_invalid_packet_size(struct RateLimiterCRC* ratelimiter, uint64_t invalid_packet_size);
 ]]
 
 local C = ffi.C
@@ -34,6 +35,8 @@ function mod.new(queue, targetRate)
 	end
 	targetRate = targetRate or 14.88
 	local mempool = memory.createMemPool{
+		n = 16384,
+		bufSize = 10000,
 		func = function(buf)
 			-- this is tcp packet because the netfpga/OSNT system we use for testing this
 			-- cannot handle all-zero packets properly (filters get confused)
@@ -58,7 +61,7 @@ function mod.new(queue, targetRate)
 		minPktSize = math.floor(linkSpeed * 10^9 / 10^6 / 8 / maxPktRate)
 	end
 
-	local delayer = C.mg_ratelimiter_crc_create(mempool, queue.id, queue.qid, minPktSize, pktOverhead)
+	local delayer = C.mg_ratelimiter_crc_create(mempool, queue.id, queue.qid, minPktSize, pktOverhead, 1500)
 	
 	return setmetatable({
 		delayer = delayer,

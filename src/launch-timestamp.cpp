@@ -33,6 +33,7 @@ void DelayEmulator::send_batch(struct rte_mbuf** load_pkts, uint16_t num_pkts){
 }
 
 void DelayEmulator::transmit_loop(){
+	ratelimiter->set_invalid_packet_size(1500);
 	rte_delay_ms(500);
 
 	// warmup
@@ -58,8 +59,10 @@ void DelayEmulator::transmit_loop(){
 	while(libmoon::is_running(0)){
 		uint64_t rx = rte_ring_sc_dequeue_burst(packet_ring, (void**)transmit_pkts, TRANSMIT_BUFFER_SIZE, NULL);
 		if(rx>0){
+			ratelimiter->set_invalid_packet_size(9000);
 			send_batch(transmit_pkts, rx);
 		}else{
+			ratelimiter->set_invalid_packet_size(1500);
 			current_byte_offset += ratelimiter->empty_delay(64);
 		}
 	}
