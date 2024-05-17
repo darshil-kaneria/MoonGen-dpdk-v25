@@ -26,9 +26,10 @@ local launchTimer = {}
 mod.launchTimer = launchTimer
 launchTimer.__index = launchTimer
 
-function mod.new(queue)
+function mod.new(queue, queue_size)
+	local queue_size = queue_size or 4194304
     local ratecontrol = crc_ratecontrol.new(queue)
-    local packet_ring = pipe:newPacketRing(4194304)
+    local packet_ring = pipe:newPacketRing(queue_size)
 	local linkSpeed = queue.dev:getLinkStatus().speed
 	local launchtimer = C.mg_launchtimer_create(ratecontrol.delayer, packet_ring.ring, queue.id, linkSpeed, ratecontrol.pktOverhead)
 	return setmetatable({
