@@ -28,6 +28,7 @@ launchTimer.__index = launchTimer
 
 function mod.new(queue, queue_size)
 	local queue_size = queue_size or 4194304
+	queue_size = math.pow(2, math.ceil(math.log(queue_size)/math.log(2)))
     local ratecontrol = crc_ratecontrol.new(queue)
     local packet_ring = pipe:newPacketRing(queue_size)
 	local linkSpeed = queue.dev:getLinkStatus().speed
