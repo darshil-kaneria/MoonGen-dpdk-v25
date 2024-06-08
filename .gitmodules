@@ -1,4 +1,4 @@
 [submodule "libmoon"]
 	path = libmoon
-	url = https://pos:8ZfuWCZKKns-5eGLvJ6b@gitlab.lrz.de/idp-lachnit/libmoon.git
+	url = https://gitlab+deploy-token-1807:gldt-Fg54ausV5oN4NMXHyNjt@gitlab.lrz.de/idp-lachnit/libmoon.git
 	branch = dpdk-22.11
