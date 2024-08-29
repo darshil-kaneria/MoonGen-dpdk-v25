@@ -90,7 +90,7 @@ void RateLimiterCRC::set_invalid_packet_size(uint64_t invalid_packet_size){
 }
 
 RateLimiterCRC::RateLimiterCRC(struct rte_mempool* invalid_pool, uint8_t port_id, uint16_t queue_id, uint64_t MIN_PACKET_SIZE, uint64_t PACKET_OVERHEAD, uint64_t invalid_packet_size):
-	 invalid_pool{invalid_pool}, port_id{port_id}, queue_id{queue_id}, previous_missing_delay{0}, MIN_PACKET_SIZE{MIN_PACKET_SIZE}, PACKET_OVERHEAD{PACKET_OVERHEAD}, invalid_packet_size{invalid_packet_size}
+	 invalid_pool{invalid_pool}, port_id{port_id}, queue_id{queue_id}, previous_missing_delay{0}, invalid_packet_size{invalid_packet_size}, MIN_PACKET_SIZE{MIN_PACKET_SIZE}, PACKET_OVERHEAD{PACKET_OVERHEAD}
 	 {}
 
 
