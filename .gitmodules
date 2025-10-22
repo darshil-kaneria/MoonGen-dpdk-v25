@@ -1,4 +1,4 @@
 [submodule "libmoon"]
 	path = libmoon
-	url = https://moongen:gldt-41G4K54jJXLqeGHrB1Qh@gitlab.lrz.de/moongen/libmoon.git
+	url = https://github.com/tumi8/libmoon
 	branch = v22.11
