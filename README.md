@@ -137,6 +137,13 @@ MoonGen prints all available ports on startup, so adjust this if necessary.
 You can also check out the examples of the [libmoon](https://github.com/tumi8/libmoon) project.
 All libmoon scripts are also valid MoonGen scripts as MoonGen extends libmoon.
 
+## MoonEm
+MoonEm is a path property emulator, based on MoonGen.
+
+To apply a delay of 10ms, a rate limit of 1000Mbit/s and a random packet loss of 1% to traffic bidirectionally forwarded between port 0 and 1, use the following command:
+
+    ./moonem 0 1 --delay 10 --rate 1000 --loss 1
+
 # Frequently Asked Questions
 
 ### Which NICs do you support?

@@ -93,7 +93,6 @@ extern "C" void sw_receiver_loop_delay(int port_id, int queue_id, struct rte_rin
 
 extern "C" void sw_receiver_loop_rate_token_bucket(int port_id, int queue_id, struct rte_ring* packet_ring, struct moonem_config config){
 	uint64_t delay =  rte_get_tsc_hz() * (config.delay / 1000000000.0);
-	const uint64_t loss_value = config.loss * 0xFFFFFFFFFFFFFFFFULL;
 	const double TOKEN_RATE = config.rate / 8.0d / rte_get_tsc_hz() * 1000000.0d;
 
 	struct rte_mbuf* bufs[BURST_SIZE];
@@ -120,7 +119,7 @@ extern "C" void sw_receiver_loop_rate_token_bucket(int port_id, int queue_id, st
 
 				current_tokens -= effective_packet_size;
 
-				if(loss_value > 0 && wyhash64(&loss_state) < loss_value){
+				if(config.loss > 0 && wyhash64(&loss_state) < config.loss){
 					rte_pktmbuf_free(bufs[i]);
 					continue;
 				}
@@ -144,7 +143,6 @@ extern "C" void sw_receiver_loop_rate_token_bucket(int port_id, int queue_id, st
 
 extern "C" void sw_receiver_loop_rate_leaky_bucket(int port_id, int queue_id, struct rte_ring* packet_ring, struct moonem_config config){
 	uint64_t delay = rte_get_tsc_hz() * (config.delay / 1000000000.0d);
-	const uint64_t loss_value = config.loss * 0xFFFFFFFFFFFFFFFFULL;
 	const double B_P_TSC_TARGET = config.rate * 1000000.0d / rte_get_tsc_hz();
 	const double BACKLOG_BOUND = config.capacity / (B_P_TSC_TARGET / 8);
 
@@ -172,7 +170,7 @@ extern "C" void sw_receiver_loop_rate_leaky_bucket(int port_id, int queue_id, st
 
 				next_at = real_send_time + ((effective_packet_size * 8.0d) / B_P_TSC_TARGET);
 
-				if(loss_value > 0 && wyhash64(&loss_state) < loss_value){
+				if(config.loss > 0 && wyhash64(&loss_state) < config.loss){
 					rte_pktmbuf_free(bufs[i]);
 					continue;
 				}
