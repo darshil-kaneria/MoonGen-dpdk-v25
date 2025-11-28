@@ -5,8 +5,8 @@ MoonGen uses hardware features for accurate and precise latency measurements and
 Skip to [Installation](#installation) and [Usage](#using-moongen) if you just want to send some packets.
 The emulation of network paths is explained in [MoonEm](#moonem).
 
-Detailed evaluation: [Paper](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf) (IMC 2015, [BibTeX entry](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015-BibTeX.txt))
-Detailed evaluation of path emulation capabilities: [Paper](https://dl.acm.org/doi/10.1145/3768976) (CoNEXT 2025, [BibTeX entry](https://net.in.tum.de/publications/bibtex/lachnit2025moonem.bib))
+* Detailed evaluation: [Paper](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf) (IMC 2015, [BibTeX entry](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015-BibTeX.txt))
+* Detailed evaluation of path emulation capabilities: [Paper](https://dl.acm.org/doi/10.1145/3768976) (CoNEXT 2025, [BibTeX entry](https://net.in.tum.de/publications/bibtex/lachnit2025moonem.bib))
 
 # MoonGen Packet Generator
 
@@ -165,5 +165,6 @@ If you want to prototype DPDK applications: use [libmoon](https://github.com/tum
 
 # References
 [1] Paul Emmerich, Sebastian Gallenmüller, Daniel Raumer, Florian Wohlfart, and Georg Carle. MoonGen: A Scriptable High-Speed Packet Generator, 2015. IMC 2015. [Available online](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf).  [BibTeX](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015-BibTeX.txt).
+
 [2]  Stefan Lachnit, Sebastian Gallenmüller, Eric Hauser, Florian Wiedner, Kilian Holzinger, Henning Stubbe, Thomas Senftl, Georg Carle. MoonEm — High-Precision Path Property Emulation Using DPDK, 2025. Proceedings of the ACM on Networking, Volume 3, Issue CoNEXT4. [Available online](https://dl.acm.org/doi/10.1145/3768976). [BibTeX](https://net.in.tum.de/publications/bibtex/lachnit2025moonem.bib).
 
