@@ -3,8 +3,10 @@ LuaJIT + DPDK = fast and flexible packet generator for 100 Gbit/s Ethernet and b
 MoonGen uses hardware features for accurate and precise latency measurements and rate control.
 
 Skip to [Installation](#installation) and [Usage](#using-moongen) if you just want to send some packets.
+The emulation of network paths is explained in [MoonEm](#moonem).
 
 Detailed evaluation: [Paper](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf) (IMC 2015, [BibTeX entry](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015-BibTeX.txt))
+Detailed evaluation of path emulation capabilities: [Paper](https://dl.acm.org/doi/10.1145/3768976) (CoNEXT 2025, [BibTeX entry](https://net.in.tum.de/publications/bibtex/lachnit2025moonem.bib))
 
 # MoonGen Packet Generator
 
@@ -30,7 +32,7 @@ You can have a look at [our slides from a talk](https://raw.githubusercontent.co
 
 
 # Architecture
-MoonGen is built on [libmoon](https://github.com/v22.11/libmoon), a Lua wrapper for DPDK.
+MoonGen is built on [libmoon](https://github.com/tumi8/libmoon), a Lua wrapper for DPDK.
 
 
 Users can write custom scripts for their experiments. It is recommended to make use of hard-coded setup-specific constants in your scripts. The script is the configuration, it is beside the point to write a complicated configuration interface for a script.
@@ -106,7 +108,7 @@ The example [l3-load-latency.lua](https://github.com/tumi8/MoonGen/blob/v22.11/e
 The simplest way to get started is using the [simple command line interface](https://github.com/tumi8/MoonGen/blob/v22.11/interface/README.md). For example:
 
     sudo ./moongen-simple start load-latency:0:1:rate=10Mp/s,timeLimit=3m
-    
+
 This sends packets with a rate of 10 million packets per second for 3 minutes from port 0 to port 1 and outputs the latency at the end of the run. Available DPDK ports are printed on startup.
 
 `load-latency` is a *flow* that is defined in `flows/examples.lua`.
@@ -125,7 +127,7 @@ Using the full API gives you complete control over MoonGen, this is recommended 
 This means that you'll have to write a custom script to use MoonGen in this mode.
 
 MoonGen comes with examples in the examples folder which can be used as a basis for custom scripts.
-Reading the example script [l3-load-latency.lua](https://github.com/tumi8/MoonGen/blob/v22.11/examples/l3-load-latency.lua?ts=4) or [quality-of-service-test.lua](https://github.com/tumi8/MoonGen/blob/v22.11/examples/quality-of-service-test.lua?ts=4) is a good way to learn more about our scripting API as these scripts uses most features of MoonGen.
+Reading the example script [l3-load-latency.lua](https://github.com/tumi8/MoonGen/blob/v22.11/examples/l3-load-latency.lua?ts=4) or [quality-of-service-test.lua](https://github.com/tumi8/MoonGen/blob/v22.11/examples/quality-of-service-test.lua?ts=4) is a good way to learn more about our scripting API as these scripts use most features of MoonGen.
 
 You can run a script like this:
 
@@ -139,6 +141,7 @@ All libmoon scripts are also valid MoonGen scripts as MoonGen extends libmoon.
 
 ## MoonEm
 MoonEm is a path property emulator, based on MoonGen.
+We performed a comprehensive evaluation of MoonEm in our [paper](https://dl.acm.org/doi/10.1145/3768976) [2].
 
 To apply a delay of 10ms, a rate limit of 1000Mbit/s and a random packet loss of 1% to traffic bidirectionally forwarded between port 0 and 1, use the following command:
 
@@ -148,9 +151,9 @@ To apply a delay of 10ms, a rate limit of 1000Mbit/s and a random packet loss of
 
 ### Which NICs do you support?
 Basic functionality is available on all [NICs supported by DPDK](http://dpdk.org/doc/nics).
-Hardware timestamping is currently supported and tested on Intel ice, igb, and i40e NICs. However, support for specific features vary between models.
+Hardware timestamping is currently supported and tested on Intel ice, igb, and i40e NICs. However, support for specific features varies between models.
 Use ``test-timestamping-capabilities.lua`` in ``examples/timestamping-tests`` to find out what your NIC supports.
-Hardware rate control is supported and tested on Intel ixgbe and i40e NICs. Hardware checksum offloading and timestamping currently does not work on ixgbe NICs with this version of Moongen.
+Hardware rate control is supported and tested on Intel ixgbe and i40e NICs. Hardware checksum offloading and timestamping currently do not work on ixgbe NICs with this version of MoonGen.
 
 
 ### What's the difference between MoonGen and libmoon?
@@ -162,4 +165,5 @@ If you want to prototype DPDK applications: use [libmoon](https://github.com/tum
 
 # References
 [1] Paul Emmerich, Sebastian Gallenmüller, Daniel Raumer, Florian Wohlfart, and Georg Carle. MoonGen: A Scriptable High-Speed Packet Generator, 2015. IMC 2015. [Available online](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015.pdf).  [BibTeX](http://www.net.in.tum.de/fileadmin/bibtex/publications/papers/MoonGen_IMC2015-BibTeX.txt).
+[2]  Stefan Lachnit, Sebastian Gallenmüller, Eric Hauser, Florian Wiedner, Kilian Holzinger, Henning Stubbe, Thomas Senftl, Georg Carle. MoonEm — High-Precision Path Property Emulation Using DPDK, 2025. Proceedings of the ACM on Networking, Volume 3, Issue CoNEXT4. [Available online](https://dl.acm.org/doi/10.1145/3768976). [BibTeX](https://net.in.tum.de/publications/bibtex/lachnit2025moonem.bib).
 
