@@ -66,7 +66,8 @@ struct rte_mbuf* RateLimiterCRC::get_delay_packet(uint64_t delay){
 	struct rte_mbuf* pkt = rte_pktmbuf_alloc(this->invalid_pool);
 	pkt->data_len = delay - PACKET_OVERHEAD;
 	pkt->pkt_len = delay - PACKET_OVERHEAD;
-	pkt->ol_flags |= RTE_MBUF_F_TX_NO_CRC_CSUM;
+	// RTE_MBUF_F_TX_NO_CRC_CSUM was removed in DPDK v25.11
+	// pkt->ol_flags |= RTE_MBUF_F_TX_NO_CRC_CSUM;
 	return pkt;
 }
 
