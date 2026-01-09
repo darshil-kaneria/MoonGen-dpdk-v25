@@ -3,8 +3,15 @@ project(MoonGen C CXX)
 
 #Options are defined in libmoon/CMakeLists.txt
 
-set(CMAKE_CXX_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu++11 -march=native -msse4.2")
-set(CMAKE_C_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu11 -march=native -msse4.2")
+IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+	set(CMAKE_CXX_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu++11 -march=native")
+	set(CMAKE_C_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu11 -march=native")
+	set(BUILD_DIR "arm64-native-linux-gcc")
+ELSE()
+	set(CMAKE_CXX_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu++11 -march=native -msse4.2")
+	set(CMAKE_C_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu11 -march=native -msse4.2")
+	set(BUILD_DIR "x86_64-native-linux-gcc")
+ENDIF()
 set(CMAKE_EXE_LINKER_FLAGS "-rdynamic")
 
 set(LIBMOON_BUILD_LIBRARY true)
@@ -14,7 +21,7 @@ add_subdirectory(libmoon)
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${CMAKE_CURRENT_SOURCE_DIR}/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/include
+	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/${BUILD_DIR}/include
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/librte_ethdev
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/luajit/src
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/lib
@@ -42,7 +49,7 @@ set(libraries
 link_directories(
 	${dpdk_STATIC_LINK_DIRS}
 	${CMAKE_CURRENT_BINARY_DIR}/libmoon
-	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/lib
+	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/${BUILD_DIR}/lib
 	${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/luajit/usr/local/lib
 )
 
