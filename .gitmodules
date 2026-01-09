@@ -1,4 +1,4 @@
 [submodule "libmoon"]
 	path = libmoon
-	url = https://github.com/tumi8/libmoon
-	branch = v22.11
+	url = https://github.com/darshil-kaneria/libmoon.git
+	branch = v25.11
