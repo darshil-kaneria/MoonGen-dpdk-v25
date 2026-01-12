@@ -20,6 +20,7 @@ add_subdirectory(libmoon)
 
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
+  set(ENV{PKG_CONFIG_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/${BUILD_DIR}/meson-private:$ENV{PKG_CONFIG_PATH}")
   pkg_check_modules(dpdk IMPORTED_TARGET libdpdk)
 endif()
 
